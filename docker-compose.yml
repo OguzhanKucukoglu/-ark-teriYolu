@@ -1,0 +1,100 @@
+version: '3.9'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: avatar_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: avatar_root_2026
+      MYSQL_DATABASE: avatar_db
+      MYSQL_USER: avatar_user
+      MYSQL_PASSWORD: avatar_pass_2026
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: avatar_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: avatar_db
+      DB_USER: avatar_user
+      DB_PASSWORD: avatar_pass_2026
+      JWT_SECRET: avatar_jwt_secret_2026_change_in_prod
+      ML_SERVICE_URL: http://ml-service:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: avatar_frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://localhost:3000/api
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: avatar_ml
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: avatar_db
+      DB_USER: avatar_user
+      DB_PASSWORD: avatar_pass_2026
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./ml-service:/app
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: avatar_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: avatar_user
+      PMA_PASSWORD: avatar_pass_2026
+    ports:
+      - "8080:80"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
