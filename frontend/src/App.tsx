@@ -9,6 +9,7 @@ import RawMaterialsPage from './pages/hayvanci/RawMaterialsPage';
 import OrdersPage from './pages/hayvanci/OrdersPage';
 import ProducerListingsPage from './pages/hayvanci/ProducerListingsPage';
 import FarmerListingsPage from './pages/hayvanci/FarmerListingsPage';
+import FarmerSalesPage from './pages/hayvanci/FarmerSalesPage';
 import ProductionPage from './pages/sucukcu/ProductionPage';
 import ProducerOrdersPage from './pages/sucukcu/ProducerOrdersPage';
 import ProducerListingsManagePage from './pages/sucukcu/ProducerListingsManagePage';
@@ -17,6 +18,8 @@ import PurchasesPage from './pages/market/PurchasesPage';
 import LotsPage from './pages/shared/LotsPage';
 import LotTracePage from './pages/shared/LotTracePage';
 import RecallPage from './pages/shared/RecallPage';
+import ReportsPage from './pages/shared/ReportsPage';
+import { InvoicesPage } from './pages/shared/InvoicesPage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -38,16 +41,19 @@ export default function App() {
           }
         >
           <Route index                           element={<DashboardPage />} />
-          {/* Hayvancı (İşletme) */}
+          {/* İşletme */}
           <Route path="butchery"                 element={<ButcheryPage />} />
           <Route path="raw-materials"            element={<RawMaterialsPage />} />
           <Route path="orders"                   element={<OrdersPage />} />
           <Route path="producer-listings"        element={<ProducerListingsPage />} />
           <Route path="farmer-listings"          element={<FarmerListingsPage />} />
-          {/* Sucukçu (Üretici) */}
+          <Route path="sales"                    element={<FarmerSalesPage />} />
+          {/* Üretici */}
           <Route path="producer-listings-manage" element={<ProducerListingsManagePage />} />
           <Route path="production"               element={<ProductionPage />} />
           <Route path="producer-orders"          element={<ProducerOrdersPage />} />
+          <Route path="sucukcu/production"       element={<ProductionPage />} />
+          <Route path="sucukcu/producer-orders"  element={<ProducerOrdersPage />} />
           {/* Market */}
           <Route path="market-listings"          element={<MarketListingsPage />} />
           <Route path="purchases"                element={<PurchasesPage />} />
@@ -55,6 +61,8 @@ export default function App() {
           <Route path="lots"                     element={<LotsPage />} />
           <Route path="lots/:id/trace"           element={<LotTracePage />} />
           <Route path="recalls"                  element={<RecallPage />} />
+          <Route path="reports"                  element={<ReportsPage />} />
+          <Route path="invoices"                 element={<InvoicesPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

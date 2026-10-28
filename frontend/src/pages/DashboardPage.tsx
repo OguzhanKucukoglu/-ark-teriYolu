@@ -31,9 +31,9 @@ export default function DashboardPage() {
   }, []);
 
   const roleWelcome: Record<string, string> = {
-    hayvanci: 'Hayvanlarınızı parçalayın, sucukçulara sipariş verin, marketlere satın.',
+    hayvanci: 'Hayvanlarınızı parçalayın, üreticilere sipariş verin, marketlere satın.',
     sucukcu:  'Gelen siparişleri yönetin, üretim emirleri oluşturun, EKP hesaplayın.',
-    market:   'Hayvancı ilanlarını inceleyin, lot bazlı satın alın, sorun bildirin.',
+    market:   'İşletme ilanlarını inceleyin, lot bazlı satın alın, sorun bildirin.',
   };
 
   return (

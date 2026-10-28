@@ -2,18 +2,21 @@ import { useEffect, useState } from 'react';
 import {
   Table, Button, Modal, Form, Select, InputNumber, DatePicker,
   Typography, Tag, message, Card, Statistic, Row, Col,
-  Input, Popconfirm,
+  Input, Popconfirm, Space, Alert, Spin, Radio, Descriptions,
 } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, InboxOutlined,
+  ScanOutlined, CheckCircleFilled, ThunderboltOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { rawMaterialService } from '../../services/api';
+import { rawMaterialService, ocrService } from '../../services/api';
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 
-// Mantıklı sıra: kuru/toz → sıvı → protein bazlı → süt/yumurta → sebze/meyve
+// Mantıklı sıra: et → kuru/toz → sıvı → protein bazlı → süt/yumurta → sebze/meyve
 const MATERIALS = [
+  { label: 'Dana Karkas / But',    unit: 'kg',  category: 'Et' },
+  { label: 'Kuzu Karkas / Parça',  unit: 'kg',  category: 'Et' },
   { label: 'Tuz',                  unit: 'kg',  category: 'Kuru/Toz' },
   { label: 'Baharat',              unit: 'kg',  category: 'Kuru/Toz' },
   { label: 'Çemen',                unit: 'kg',  category: 'Kuru/Toz' },
@@ -30,6 +33,7 @@ const MATERIALS = [
 ];
 
 const CATEGORY_COLORS: Record<string, string> = {
+  'Et':           'volcano',
   'Kuru/Toz':     'orange',
   'Sıvı':         'blue',
   'Sebze/Meyve':  'green',
@@ -58,6 +62,50 @@ export default function RawMaterialsPage() {
 
   // Seçili malzeme türüne göre varsayılan birimi otomatik doldur
   const [selectedUnit, setSelectedUnit] = useState<string>('kg');
+
+  // OCR Fatura / İrsaliye Okuma State
+  const [ocrOpen, setOcrOpen] = useState(false);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrSample, setOcrSample] = useState<string>('sample_meat');
+  const [ocrResult, setOcrResult] = useState<any | null>(null);
+
+  async function runOcr(sampleKey: string) {
+    setOcrLoading(true);
+    setOcrSample(sampleKey);
+    try {
+      const { data } = await ocrService.analyze({ sampleId: sampleKey });
+      if (data.success) {
+        setOcrResult(data.data);
+      }
+    } catch {
+      message.error('Belge OCR ile okunamadı');
+    } finally {
+      setOcrLoading(false);
+    }
+  }
+
+  function openOcrModal() {
+    setOcrOpen(true);
+    if (!ocrResult) {
+      runOcr('sample_meat');
+    }
+  }
+
+  function applyOcrToForm() {
+    if (!ocrResult) return;
+    form.setFieldsValue({
+      material_type: ocrResult.material_label || ocrResult.material_type,
+      quantity: ocrResult.quantity,
+      unit: ocrResult.unit || 'kg',
+      unit_price: ocrResult.unit_price,
+      supplier_name: ocrResult.supplier_name,
+      expiry_date: ocrResult.expiry_date ? dayjs(ocrResult.expiry_date) : undefined,
+    });
+    setSelectedUnit(ocrResult.unit || 'kg');
+    setOcrOpen(false);
+    setModalOpen(true);
+    message.success('OCR fatura bilgileri hammadde formuna aktarıldı!');
+  }
 
   async function load() {
     try {
@@ -180,9 +228,18 @@ export default function RawMaterialsPage() {
         <Title level={3} style={{ margin: 0 }}>
           <InboxOutlined /> Hammadde Stoğu
         </Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
-          Hammadde Ekle
-        </Button>
+        <Space>
+          <Button
+            icon={<ScanOutlined />}
+            style={{ borderColor: '#722ed1', color: '#722ed1', fontWeight: 500 }}
+            onClick={openOcrModal}
+          >
+            Fatura / İrsaliye Tara (OCR)
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
+            Hammadde Ekle
+          </Button>
+        </Space>
       </div>
 
       {/* İstatistik kartları */}
@@ -219,8 +276,27 @@ export default function RawMaterialsPage() {
         open={modalOpen}
         onCancel={() => { setModalOpen(false); form.resetFields(); }}
         footer={null}
-        width={480}
+        width={500}
       >
+        <div style={{
+          background: '#f9f0ff', padding: '10px 14px', borderRadius: 8,
+          border: '1px solid #d3adf7', marginBottom: 16,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <div>
+            <Text strong style={{ color: '#531dab', fontSize: 13 }}>📸 Fatura veya İrsaliyeniz mi var?</Text>
+            <div style={{ fontSize: 11, color: '#722ed1' }}>Yapay zeka ile alanları otomatik doldurun.</div>
+          </div>
+          <Button
+            size="small"
+            style={{ borderColor: '#722ed1', color: '#722ed1', fontWeight: 500 }}
+            icon={<ScanOutlined />}
+            onClick={() => { setModalOpen(false); openOcrModal(); }}
+          >
+            OCR İle Oku
+          </Button>
+        </div>
+
         <Form form={form} onFinish={onSubmit} layout="vertical" size="large">
 
           <Form.Item name="material_type" label="Hammadde Türü" rules={[{ required: true, message: 'Hammadde seçin' }]}>
@@ -290,6 +366,151 @@ export default function RawMaterialsPage() {
             </Button>
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* ── 📸 Yapay Zeka Fatura / İrsaliye Okuma (OCR) Modalı ── */}
+      <Modal
+        title={
+          <Space>
+            <ScanOutlined style={{ color: '#722ed1' }} />
+            <span>Fatura & İrsaliye Görselinden Otomatik Okuma (OCR)</span>
+            <Tag color="purple">Akıllı Belge Tanıma</Tag>
+          </Space>
+        }
+        open={ocrOpen}
+        onCancel={() => setOcrOpen(false)}
+        width={750}
+        footer={
+          <Space>
+            <Button onClick={() => setOcrOpen(false)}>Vazgeç</Button>
+            <Button
+              type="primary"
+              style={{ background: '#722ed1', borderColor: '#722ed1' }}
+              icon={<CheckCircleFilled />}
+              disabled={!ocrResult}
+              onClick={applyOcrToForm}
+            >
+              Bilgileri Hammadde Formuna Aktar
+            </Button>
+          </Space>
+        }
+      >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Yapay Zeka Destekli Belge Ayrıştırıcı (OCR Motoru)"
+          description="Satın aldığınız et, baharat, bağırsak veya katkı maddelerine ait sevk irsaliyesi veya faturaları yükleyebilir ya da aşağıdaki hazır belge şablonlarını deneyebilirsiniz."
+        />
+
+        {/* Demo Şablon Seçimi */}
+        <div style={{ marginBottom: 16 }}>
+          <Text strong style={{ display: 'block', marginBottom: 8 }}>
+            Hazır İrsaliye & Belge Şablonları:
+          </Text>
+          <Radio.Group
+            value={ocrSample}
+            onChange={e => runOcr(e.target.value)}
+            buttonStyle="solid"
+            style={{ width: '100%' }}
+          >
+            <Row gutter={[8, 8]}>
+              <Col span={8}>
+                <Radio.Button value="sample_meat" style={{ width: '100%', textAlign: 'center', height: 'auto', padding: '8px 4px' }}>
+                  <div style={{ fontWeight: 600 }}>🥩 Et İrsaliyesi</div>
+                  <div style={{ fontSize: 11, color: '#888' }}>100 kg Dana But (9.70 €)</div>
+                </Radio.Button>
+              </Col>
+              <Col span={8}>
+                <Radio.Button value="sample_spice" style={{ width: '100%', textAlign: 'center', height: 'auto', padding: '8px 4px' }}>
+                  <div style={{ fontWeight: 600 }}>🌶️ Baharat Faturası</div>
+                  <div style={{ fontSize: 11, color: '#888' }}>25 kg Sucuk Baharatı</div>
+                </Radio.Button>
+              </Col>
+              <Col span={8}>
+                <Radio.Button value="sample_casing" style={{ width: '100%', textAlign: 'center', height: 'auto', padding: '8px 4px' }}>
+                  <div style={{ fontWeight: 600 }}>🌭 Bağırsak İrsaliyesi</div>
+                  <div style={{ fontSize: 11, color: '#888' }}>50 kg Doğal Bağırsak</div>
+                </Radio.Button>
+              </Col>
+            </Row>
+          </Radio.Group>
+        </div>
+
+        {/* OCR Sonuç Kartı */}
+        {ocrLoading ? (
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <Spin tip="Belge taranıyor ve yapay zeka ile alanlar ayrıştırılıyor..." />
+          </div>
+        ) : ocrResult ? (
+          <div>
+            <div style={{
+              background: '#f9f0ff', padding: '12px 16px', borderRadius: 8,
+              border: '1px solid #d3adf7', marginBottom: 16,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <Space>
+                <ThunderboltOutlined style={{ color: '#722ed1', fontSize: 18 }} />
+                <Text strong style={{ color: '#531dab' }}>
+                  Ayrıştırma Başarılı — Güven Skoru: %{(ocrResult.confidence * 100).toFixed(1)}
+                </Text>
+              </Space>
+              <Tag color="success">Yüksek Doğruluk</Tag>
+            </div>
+
+            <Row gutter={16}>
+              {/* Sol: Ayrıştırılan Alanlar */}
+              <Col span={13}>
+                <Card size="small" title="Ayrıştırılan Form Verileri" style={{ height: '100%' }}>
+                  <Descriptions size="small" bordered column={1}>
+                    <Descriptions.Item label="Tedarikçi Firma">
+                      <Text strong>{ocrResult.supplier_name}</Text>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="İrsaliye / Fatura No">
+                      <Tag color="blue">{ocrResult.invoice_number}</Tag>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Malzeme">
+                      <Tag color="volcano">{ocrResult.material_label || ocrResult.material_type}</Tag>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Miktar">
+                      <Text strong style={{ color: '#1890ff' }}>{ocrResult.quantity} {ocrResult.unit}</Text>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Birim Fiyat">
+                      {ocrResult.unit_price?.toFixed(2)} € / {ocrResult.unit}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Toplam Tutar">
+                      <Text strong style={{ color: '#52c41a' }}>{ocrResult.total_amount?.toFixed(2)} €</Text>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Parti / Lot No">
+                      <Tag color="purple">{ocrResult.lot_number}</Tag>
+                    </Descriptions.Item>
+                    {ocrResult.expiry_date && (
+                      <Descriptions.Item label="Son Kullanma Tarihi">
+                        {dayjs(ocrResult.expiry_date).format('DD.MM.YYYY')}
+                      </Descriptions.Item>
+                    )}
+                  </Descriptions>
+                </Card>
+              </Col>
+
+              {/* Sağ: Belgeden Çıkarılan Ham Metin */}
+              <Col span={11}>
+                <Card size="small" title="Belgeden Okunan Ham Metin" style={{ height: '100%', background: '#fafafa' }}>
+                  <pre style={{
+                    fontSize: 11, background: '#262626', color: '#52c41a',
+                    padding: 10, borderRadius: 6, maxHeight: 220, overflowY: 'auto',
+                    margin: 0, fontFamily: 'monospace',
+                  }}>
+                    {ocrResult.detected_text}
+                  </pre>
+                  <Paragraph type="secondary" style={{ fontSize: 11, marginTop: 8, marginBottom: 0 }}>
+                    💡 Regex & Doğal Dil İşleme kuralları ile metindeki şirket, miktar ve fiyat şablonları çözümlenmiştir.
+                  </Paragraph>
+                </Card>
+              </Col>
+            </Row>
+          </div>
+        ) : null}
       </Modal>
     </div>
   );

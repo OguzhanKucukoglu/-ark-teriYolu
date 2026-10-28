@@ -88,6 +88,68 @@ router.post('/predict/butchery', async (req, res) => {
   }
 });
 
+// ── MODEL DOĞRULAMA VE METRİK ENDPOINT'LERİ (Baseline vs ML) ───────────────
+
+// Model A: Üretim ve EKP modelinin baseline ile karşılaştırması ve metrikleri
+router.get('/evaluate/production', async (_req, res) => {
+  try {
+    const history = await selectQuery(
+      sequelize,
+      `SELECT
+         po.id,
+         po.expected_qty,
+         po.actual_qty,
+         po.service_cost,
+         po.total_raw_cost,
+         po.ekp
+       FROM production_orders po
+       WHERE po.status = 'tamamlandi' AND po.actual_qty IS NOT NULL
+       ORDER BY po.created_at DESC
+       LIMIT 100`,
+      []
+    );
+
+    const response = await axios.post(`${ML_URL}/evaluate/production`, {
+      history,
+    });
+    res.json(response.data);
+  } catch {
+    res.status(503).json({ error: 'ML servisi kullanılamıyor' });
+  }
+});
+
+// Model B: Parçalama modelinin reçete baseline ile karşılaştırması ve metrikleri
+router.get('/evaluate/butchery', async (req, res) => {
+  try {
+    const animalType = (req.query.animal_type as string) || 'koyun';
+    const history = await selectQuery(
+      sequelize,
+      `SELECT
+         bo.id,
+         bo.animal_type,
+         bo.input_weight_kg,
+         bo.total_output_kg,
+         bo.waste_kg,
+         bp.part_name,
+         bp.actual_weight_kg
+       FROM butchery_operations bo
+       JOIN butchery_parts bp ON bp.butchery_operation_id = bo.id
+       WHERE LOWER(bo.animal_type) = LOWER(?)
+       ORDER BY bo.created_at DESC
+       LIMIT 200`,
+      [animalType]
+    );
+
+    const response = await axios.post(`${ML_URL}/evaluate/butchery`, {
+      animal_type: animalType,
+      history,
+    });
+    res.json(response.data);
+  } catch {
+    res.status(503).json({ error: 'ML servisi kullanılamıyor' });
+  }
+});
+
 // ── EĞİTİM VERİSİ ENDPOINT'LERİ (ML servisi için ham veri) ──────────────────
 
 // Üretici bazlı geçmiş üretim verisi

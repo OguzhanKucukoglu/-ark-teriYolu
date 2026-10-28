@@ -29,23 +29,32 @@ export async function completeProduction(req: AuthRequest, res: Response): Promi
 
     const productionOrder = orders[0];
 
-    const rawCosts = await selectQuery<{ total: string }>(
+    // Toplam hammadde girdi miktarını (kg) ve toplam hammadde maliyetini hesapla
+    const rawMaterialsSum = await selectQuery<{ total_kg: string; total_cost: string }>(
       sequelize,
-      'SELECT COALESCE(SUM(total_cost), 0) as total FROM production_raw_materials WHERE production_order_id = ?',
+      'SELECT COALESCE(SUM(quantity_used), 0) as total_kg, COALESCE(SUM(total_cost), 0) as total_cost FROM production_raw_materials WHERE production_order_id = ?',
       [req.params.id],
       t
     );
 
-    const totalRawCost = parseFloat(rawCosts[0]?.total || '0');
-    const totalCost    = totalRawCost + parseFloat(String(service_cost));
-    const ekp          = totalCost / actual_qty;
+    const totalInputKg = parseFloat(rawMaterialsSum[0]?.total_kg || '0');
+    const totalRawCost = parseFloat(rawMaterialsSum[0]?.total_cost || '0');
+    const packageWeight = 1.00; // Standart 1.00 kg/paket
+    const actualPackages = parseInt(String(actual_qty), 10) || Math.floor(Number(actual_qty));
+    const netPackagedKg = actualPackages * packageWeight;
+    const fireQty = Math.max(0, parseFloat((totalInputKg - netPackagedKg).toFixed(3)));
+    const fireRate = totalInputKg > 0 ? parseFloat(((fireQty / totalInputKg) * 100).toFixed(2)) : 0.00;
+
+    const totalCost = totalRawCost + parseFloat(String(service_cost));
+    const ekp = actualPackages > 0 ? totalCost / actualPackages : 0;
 
     await sequelize.query(
       `UPDATE production_orders
-       SET actual_qty = ?, service_cost = ?, total_raw_cost = ?, ekp = ?,
+       SET actual_qty = ?, package_weight = ?, total_input_kg = ?, fire_qty = ?, fire_rate = ?,
+           service_cost = ?, total_raw_cost = ?, ekp = ?,
            status = 'tamamlandi', production_date = ?
        WHERE id = ?`,
-      { replacements: [actual_qty, service_cost, totalRawCost, ekp, production_date || new Date(), req.params.id], transaction: t }
+      { replacements: [actualPackages, packageWeight, totalInputKg, fireQty, fireRate, service_cost, totalRawCost, ekp, production_date || new Date(), req.params.id], transaction: t }
     );
 
     const countRows = await selectQuery<{ cnt: number }>(
@@ -59,14 +68,14 @@ export async function completeProduction(req: AuthRequest, res: Response): Promi
       `INSERT INTO lots (lot_number, lot_type, owner_id, quantity, unit, unit_cost, total_cost, production_date, status)
        SELECT ?, 'mamul', o.buyer_id, ?, 'paket', ?, ?, ?, 'active'
        FROM orders o WHERE o.id = ?`,
-      [lotNumber, actual_qty, ekp, totalCost, production_date || new Date(), productionOrder.order_id],
+      [lotNumber, actualPackages, ekp, totalCost, production_date || new Date(), productionOrder.order_id],
       t
     );
 
     await insertQuery(
       sequelize,
       'INSERT INTO production_finished_lots (production_order_id, lot_id, quantity, unit) VALUES (?, ?, ?, ?)',
-      [req.params.id, lotId, actual_qty, 'paket'],
+      [req.params.id, lotId, actualPackages, 'paket'],
       t
     );
 
@@ -74,13 +83,46 @@ export async function completeProduction(req: AuthRequest, res: Response): Promi
       sequelize,
       `INSERT INTO lot_movements (lot_id, movement_type, quantity, unit, reference_type, reference_id)
        VALUES (?, 'giris', ?, 'paket', 'production_order', ?)`,
-      [lotId, actual_qty, req.params.id],
+      [lotId, actualPackages, req.params.id],
       t
     );
 
     await sequelize.query(
       "UPDATE orders SET status = 'tamamlandi' WHERE id = ?",
       { replacements: [productionOrder.order_id], transaction: t }
+    );
+
+    // Fason Üretim / İşçilik Hizmeti Faturası oluştur (Sucukçu -> İşletme / Hayvancı)
+    const invCount = await selectQuery<{ cnt: number }>(
+      sequelize, "SELECT COUNT(*) as cnt FROM invoices WHERE invoice_type = 'hizmet'", [], t
+    );
+    const invSeq = (invCount[0]?.cnt || 0) + 1;
+    const invoiceNumber = `FTR-HZM-${new Date().getFullYear()}-${String(invSeq).padStart(3, '0')}`;
+    const unitServiceCost = actualPackages > 0 ? parseFloat((Number(service_cost) / actualPackages).toFixed(4)) : Number(service_cost);
+
+    await sequelize.query(
+      `INSERT INTO invoices 
+       (invoice_number, invoice_type, sender_id, receiver_id, reference_type, reference_id, lot_number, product_name, description, quantity, unit, unit_price, subtotal, tax_rate, tax_amount, total_amount, currency, status, invoice_date)
+       SELECT ?, 'hizmet', ?, o.buyer_id, 'production_order', ?, ?, CONCAT(?, ' - Fason Üretim / İşçilik Hizmeti'),
+              'Hammaddeler işletmeye aittir; hizmet bedeli fason işçilik faturasıdır.',
+              ?, 'paket', ?, ?, 0.00, 0.00, ?, '€', 'odendi', ?
+       FROM orders o WHERE o.id = ?`,
+      {
+        replacements: [
+          invoiceNumber,
+          req.user!.id,
+          req.params.id,
+          lotNumber,
+          productionOrder.product_name,
+          actualPackages,
+          unitServiceCost,
+          service_cost,
+          service_cost,
+          production_date || new Date(),
+          productionOrder.order_id
+        ],
+        transaction: t
+      }
     );
 
     await t.commit();
@@ -92,7 +134,11 @@ export async function completeProduction(req: AuthRequest, res: Response): Promi
     res.json({
       message:     'Üretim tamamlandı',
       lotNumber,
-      actualQty:   actual_qty,
+      actualQty:   actualPackages,
+      packageWeight,
+      totalInputKg,
+      fireQty,
+      fireRate,
       totalRawCost,
       serviceCost: parseFloat(String(service_cost)),
       totalCost,

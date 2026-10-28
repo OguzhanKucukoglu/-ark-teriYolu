@@ -1,14 +1,15 @@
-﻿import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Card, Button, Modal, Typography, Tag, App,
-  Row, Col, Input, Empty, Spin, Descriptions, Divider,
-  InputNumber, Alert, Progress, Tooltip, Select, Checkbox,
+  Row, Col, Input, Empty, Descriptions, Divider,
+  InputNumber, Alert, Progress, Tooltip, Checkbox, Space,
 } from 'antd';
 import {
   SearchOutlined, PhoneOutlined, EnvironmentOutlined,
   ShoppingCartOutlined, InfoCircleOutlined, ExperimentOutlined,
-  RobotOutlined, ThunderboltOutlined, FilterOutlined,
-  CheckCircleOutlined, CloseCircleOutlined, WarningOutlined,
+  RobotOutlined, FilterOutlined,
+  CheckCircleOutlined, CloseCircleOutlined,
+  ThunderboltOutlined, ClearOutlined,
 } from '@ant-design/icons';
 import { listingService, mlService, rawMaterialService, butcheryService, orderService } from '../../services/api';
 
@@ -23,9 +24,6 @@ const PRODUCT_META: Record<string, { emoji: string; color: string }> = {
   'Pastırma': { emoji: '🥓', color: '#722ed1' },
 };
 
-// source: 'part' → parçalama lotu  |  'stock' → raw_materials deposu
-// source: 'part'  → sadece et (parçalama lotundan, hayvan seçimi gerektirir)
-// source: 'stock' → raw_materials deposu (bağırsak dahil diğer tüm malzemeler)
 const PRODUCT_MATERIALS: Record<string, { name: string; unit: string; source: 'part' | 'stock' }[]> = {
   'Sucuk': [
     { name: 'Et',       unit: 'kg', source: 'part'  },
@@ -61,7 +59,7 @@ const PRODUCT_MATERIALS: Record<string, { name: string; unit: string; source: 'p
 };
 
 const ANIMAL_META: Record<string, { emoji: string; label: string }> = {
-  'inek':  { emoji: '🐄', label: 'İnek' },
+  'inek':  { emoji: '🐄', label: 'İnek / Dana' },
   'koyun': { emoji: '🐑', label: 'Koyun / Kuzu' },
   'tavuk': { emoji: '🐔', label: 'Tavuk' },
 };
@@ -72,6 +70,78 @@ const ANIMAL_PRODUCTS: Record<string, string[]> = {
   'koyun': ['Sucuk', 'Salam', 'Sosis'],
   'tavuk': ['Sucuk', 'Salam', 'Sosis'],
 };
+
+// ── Parça Uyum Kontrolü (Öneri B) ──────────────────────────────────────────────
+interface PartSuitability {
+  status: 'recommended' | 'warning' | 'unsuitable' | 'neutral';
+  badge: string;
+  tagColor: string;
+  description: string;
+}
+
+const PRODUCT_SUITABLE_PARTS: Record<string, {
+  recommended: string[];
+  unsuitable: string[];
+  unsuitableReason: string;
+  luxuryWarn?: string[];
+}> = {
+  'Pastırma': {
+    recommended: ['antrikot', 'kontrifile', 'kontrfile', 'sokum', 'nuat', 'tranç', 'bonfile'],
+    unsuitable: ['kaburga', 'gerdan', 'kol', 'but', 'incik', 'bağırsak', 'bütün tavuk', 'pirzola'],
+    unsuitableReason: 'Pastırma için uygun değildir. Pastırma sadece blok bifteklik etlerle (Antrikot, Kontrfile, Sokum, Nuat) üretilebilir.',
+  },
+  'Sucuk': {
+    recommended: ['kaburga', 'gerdan', 'kol', 'but', 'incik', 'kuşbaşı', 'kıyma', 'döş'],
+    unsuitable: ['bağırsak', 'bütün tavuk'],
+    unsuitableReason: 'Kırmızı et sucuğu için ana et olarak uygun değildir.',
+    luxuryWarn: ['antrikot', 'kontrifile', 'kontrfile', 'bonfile'],
+  },
+  'Salam': {
+    recommended: ['gerdan', 'kol', 'but', 'kaburga', 'incik', 'bütün tavuk'],
+    unsuitable: ['bağırsak'],
+    unsuitableReason: 'Ana et parçası olarak kullanılamaz.',
+  },
+  'Sosis': {
+    recommended: ['gerdan', 'kol', 'but', 'kaburga', 'incik', 'bütün tavuk'],
+    unsuitable: ['bağırsak'],
+    unsuitableReason: 'Ana et parçası olarak kullanılamaz.',
+  },
+};
+
+function getPartSuitability(productName: string, partName: string): PartSuitability {
+  const norm = partName.toLowerCase().trim();
+  const rule = PRODUCT_SUITABLE_PARTS[productName];
+  if (!rule) return { status: 'neutral', badge: 'Normal', tagColor: 'default', description: 'Kullanılabilir' };
+
+  if (rule.unsuitable.some(u => norm.includes(u))) {
+    return {
+      status: 'unsuitable',
+      badge: '❌ Uyumsuz',
+      tagColor: 'error',
+      description: rule.unsuitableReason,
+    };
+  }
+
+  if (rule.luxuryWarn && rule.luxuryWarn.some(l => norm.includes(l))) {
+    return {
+      status: 'warning',
+      badge: '⚠️ Lüks Parça',
+      tagColor: 'warning',
+      description: 'Bifteklik değerli et. Kıyma/harç yerine pastırma veya taze satış için önerilir.',
+    };
+  }
+
+  if (rule.recommended.some(r => norm.includes(r))) {
+    return {
+      status: 'recommended',
+      badge: '✅ İdeal Parça',
+      tagColor: 'success',
+      description: `${productName} üretimi için ideal ve tavsiye edilen et parçasıdır.`,
+    };
+  }
+
+  return { status: 'neutral', badge: 'Kullanılabilir', tagColor: 'blue', description: 'Standart et parçası.' };
+}
 
 // ── Tipler ────────────────────────────────────────────────────────────────────
 interface ProducerListing {
@@ -110,19 +180,17 @@ interface AvailablePart {
 }
 
 interface MLResult {
+  predicted_packages?: number;
+  package_weight?: number;
+  total_input_kg?: number;
+  predicted_fire_kg?: number;
+  predicted_fire_rate?: number;
   predicted_qty_ratio: number;
   predicted_ekp: number;
   confidence: number;
   sample_count: number;
   method: string;
   notes: string;
-}
-
-// Seçilen parça lotu + miktar
-interface PartSelection {
-  lot_id: number;
-  kg: number;
-  checked: boolean; // gönderilecek mi?
 }
 
 function confidenceColor(c: number) {
@@ -139,45 +207,44 @@ function methodLabel(m: string) {
   return map[m] ?? m;
 }
 
-// ── Bileşen ───────────────────────────────────────────────────────────────────
+// ── Ana Bileşen ───────────────────────────────────────────────────────────────
 export default function ProducerListingsPage() {
   const { message: msg } = App.useApp();
 
-  const [listings, setListings] = useState<ProducerListing[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [search, setSearch]     = useState('');
-
-  const [stock, setStock]           = useState<RawMaterial[]>([]);
-  const [availParts, setAvailParts] = useState<AvailablePart[]>([]);
+  const [listings, setListings]         = useState<ProducerListing[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [stock, setStock]               = useState<RawMaterial[]>([]);
+  const [availParts, setAvailParts]     = useState<AvailablePart[]>([]);
   const [stockLoading, setStockLoading] = useState(true);
 
-  // Filtre state
-  const [selProduct, setSelProduct] = useState<string | null>(null);
-  const [selAnimal,  setSelAnimal]  = useState<string | null>(null);
-  // part kaynaklı hammadde adı → PartSelection (her parça adı için ayrı satır)
-  const [partSel, setPartSel] = useState<Record<string, PartSelection>>({});
-  // stock kaynaklı hammadde adı → kg
-  const [stockInputs, setStockInputs] = useState<Record<string, number>>({});
+  // ── Sadece Arama & Filtre State (Siparişten tamamen bağımsız) ──
+  const [search, setSearch]             = useState('');
+  const [selProduct, setSelProduct]     = useState<string | null>(null);
+  const [selAnimal, setSelAnimal]       = useState<string | null>(null);
 
-  // Detay modal
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [selListing, setSelListing] = useState<ProducerListing | null>(null);
+  // ── Detay Modalı State ──
+  const [detailOpen, setDetailOpen]     = useState(false);
+  const [selListing, setSelListing]     = useState<ProducerListing | null>(null);
 
-  // ML modal
-  const [mlOpen,    setMlOpen]    = useState(false);
-  const [mlListing, setMlListing] = useState<ProducerListing | null>(null);
-  const [mlInputs,  setMlInputs]  = useState<Record<string, number>>({});
-  const [mlResult,  setMlResult]  = useState<MLResult | null>(null);
-  const [mlLoading, setMlLoading] = useState(false);
+  // ── ML Tahmin Modalı State ──
+  const [mlOpen, setMlOpen]             = useState(false);
+  const [mlListing, setMlListing]       = useState<ProducerListing | null>(null);
+  const [mlInputs, setMlInputs]         = useState<Record<string, number>>({});
+  const [mlResult, setMlResult]         = useState<MLResult | null>(null);
+  const [mlLoading, setMlLoading]       = useState(false);
 
-  // Sipariş modal
-  const [orderOpen,      setOrderOpen]      = useState(false);
-  const [orderListing,   setOrderListing]   = useState<ProducerListing | null>(null);
-  const [orderInputs,    setOrderInputs]    = useState<Record<string, number>>({});
-  const [orderNote,      setOrderNote]      = useState('');
+  // ── Sipariş Modalı State (Parça seçimi, hammadde girişi ve sipariş burada) ──
+  const [orderOpen, setOrderOpen]             = useState(false);
+  const [orderListing, setOrderListing]       = useState<ProducerListing | null>(null);
+  // Parça ID -> seçilen kg
+  const [orderPartKgs, setOrderPartKgs]       = useState<Record<number, number>>({});
+  // Depo hammaddesi adı -> seçilen kg (Tuz, Sarımsak, Baharat vb.)
+  const [orderStockInputs, setOrderStockInputs] = useState<Record<string, number>>({});
+  const [orderNote, setOrderNote]             = useState('');
   const [orderSubmitting, setOrderSubmitting] = useState(false);
+  const [orderAnimalFilter, setOrderAnimalFilter] = useState<string | null>(null);
 
-  // ── Yükle ────────────────────────────────────────────────────────────────
+  // ── Verileri Yükle ──────────────────────────────────────────────────────────
   useEffect(() => {
     listingService.getProducerListings()
       .then(r => setListings(r.data))
@@ -189,23 +256,7 @@ export default function ProducerListingsPage() {
       .finally(() => setStockLoading(false));
   }, []);
 
-  // ── Reset ────────────────────────────────────────────────────────────────
-  function onProductSelect(p: string | null) {
-    setSelProduct(p); setSelAnimal(null); setPartSel({}); setStockInputs({});
-  }
-  function onAnimalSelect(a: string | null) {
-    setSelAnimal(a);
-    setPartSel({});
-    // Seçili ürün bu hayvanla uyumsuzsa sıfırla
-    if (a && selProduct && !(ANIMAL_PRODUCTS[a] ?? []).includes(selProduct)) {
-      setSelProduct(null);
-      setStockInputs({});
-    }
-  }
-
-  // ── Stok haritaları ──────────────────────────────────────────────────────
-
-  // raw_materials toplamı (Tuz, Baharat, Sarımsak vb.)
+  // ── Stok Haritaları ─────────────────────────────────────────────────────────
   const stockMap = useMemo(() => {
     const m: Record<string, number> = {};
     stock.forEach(s => {
@@ -215,120 +266,30 @@ export default function ProducerListingsPage() {
     return m;
   }, [stock]);
 
-  // Seçilen hayvandan, bu parça adındaki toplam aktif kg
-  // "Et" gibi soyut bir ad eşleşmiyorsa → seçili hayvanın TÜM parçalarının toplamı
-  function getPartAvail(matName: string): number {
-    if (!selAnimal) return 0;
+  // Depodaki toplam aktif et miktarı (tüm aktif parçalar)
+  const totalAvailMeatKg = useMemo(() => {
+    return availParts.reduce((s, p) => s + Number(p.available_kg || 0), 0);
+  }, [availParts]);
 
-    const matKey    = matName.toLocaleLowerCase('tr-TR');
-    const animalKey = selAnimal.toLocaleLowerCase('tr-TR');
-
-    // Önce birebir parça adı eşleşmesine bak (örn. "Bağırsak")
-    const direct = availParts
-      .filter(p =>
-        p.animal_type.toLocaleLowerCase('tr-TR') === animalKey &&
-        p.part_name.toLocaleLowerCase('tr-TR')   === matKey
-      )
-      .reduce((s, p) => s + Number(p.available_kg), 0);
-
-    if (direct > 0) return direct;
-
-    // Eşleşme yoksa (örn. "Et") → seçili hayvandaki tüm aktif parçaların toplamı
-    return availParts
-      .filter(p =>
-        p.animal_type.toLocaleLowerCase('tr-TR') === animalKey &&
-        Number(p.available_kg) > 0
-      )
-      .reduce((s, p) => s + Number(p.available_kg), 0);
-  }
-
-  // Birleşik stok: hem raw_materials hem parça lotlarını tek haritada göster
-  function getUnifiedAvail(matName: string, source: 'part' | 'stock'): number {
-    if (source === 'part') return getPartAvail(matName);
-
+  // Belirli bir hammadde için toplam stok (parça veya raw_materials)
+  function getUnifiedAvail(matName: string, _source?: 'part' | 'stock'): number {
     const matKey = matName.toLocaleLowerCase('tr-TR').trim();
 
-    // raw_materials'da doğrudan bu isimle kayıt var mı?
+    if (matKey === 'et') {
+      return totalAvailMeatKg > 0 ? totalAvailMeatKg : (stockMap['et'] ?? 0);
+    }
+
     let fromStock = stockMap[matKey] ?? 0;
-
-    // "Bağırsak" ise hayvan türüne özgü adla da bak
-    // (parçalamadan "İnek Bağırsağı" / "Koyun Bağırsağı" olarak kaydedilir)
     if (matKey === 'bağırsak') {
-      const inekKey  = 'inek bağırsağı';
-      const koyunKey = 'koyun bağırsağı';
-      if (selAnimal) {
-        const ak = selAnimal.toLocaleLowerCase('tr-TR');
-        if (ak === 'inek' || ak === 'dana') {
-          fromStock += stockMap[inekKey] ?? 0;
-        } else if (ak === 'koyun' || ak === 'kuzu') {
-          fromStock += stockMap[koyunKey] ?? 0;
-        }
-      } else {
-        // Hayvan seçilmemişse her iki türü topla
-        fromStock += (stockMap[inekKey] ?? 0) + (stockMap[koyunKey] ?? 0);
-      }
+      fromStock += (stockMap['inek bağırsağı'] ?? 0) + (stockMap['koyun bağırsağı'] ?? 0);
+      const partCasing = availParts
+        .filter(p => p.part_name.toLocaleLowerCase('tr-TR').includes('bağırsak'))
+        .reduce((s, p) => s + Number(p.available_kg), 0);
+      fromStock += partCasing;
     }
 
-    // Aynı isimde aktif parça lotu da olabilir
-    const fromParts = availParts
-      .filter(p =>
-        p.part_name.toLocaleLowerCase('tr-TR') === matKey &&
-        Number(p.available_kg) > 0 &&
-        (selAnimal ? p.animal_type.toLocaleLowerCase('tr-TR') === selAnimal.toLocaleLowerCase('tr-TR') : true)
-      )
-      .reduce((s, p) => s + Number(p.available_kg), 0);
-
-    return fromStock + fromParts;
+    return fromStock;
   }
-
-  // Lot listesi (seçilen hayvan + parça adı)
-  function getPartLots(partName: string): AvailablePart[] {
-    if (!selAnimal) return [];
-    return availParts.filter(
-      p => p.animal_type.toLocaleLowerCase('tr-TR') === selAnimal.toLocaleLowerCase('tr-TR')
-        && p.part_name.toLocaleLowerCase('tr-TR')   === partName.toLocaleLowerCase('tr-TR')
-    );
-  }
-
-  // Girilen miktar (checked + kg set ise)
-  function getEnteredKg(matName: string, source: 'part' | 'stock'): number {
-    if (source === 'part') {
-      const s = partSel[matName];
-      return s?.checked ? (s.kg ?? 0) : 0;
-    }
-    return stockInputs[matName] ?? 0;
-  }
-
-  // ── Kaç birim üretim yapılabilir ─────────────────────────────────────────
-  function calcMaxBatches(listing: ProducerListing): number | null {
-    if (!selProduct || listing.product_name !== selProduct) return null;
-    const mats    = parseMaterials(listing.required_materials);
-    const matDefs = PRODUCT_MATERIALS[selProduct] ?? [];
-    const active  = matDefs.filter(m => getEnteredKg(m.name, m.source) > 0);
-    if (active.length === 0) return null;
-    let min = Infinity;
-    active.forEach(m => {
-      const need = mats[m.name]?.amount;
-      const have = getEnteredKg(m.name, m.source);
-      if (need && need > 0) min = Math.min(min, have / need);
-    });
-    return isFinite(min) ? min : null;
-  }
-
-  // ── Filtre + sıralama ────────────────────────────────────────────────────
-  const displayed = useMemo(() => {
-    let r = listings;
-    if (search) {
-      const l = search.toLowerCase();
-      r = r.filter(x => x.product_name.toLowerCase().includes(l) || x.producer_name.toLowerCase().includes(l));
-    }
-    if (selProduct) r = r.filter(x => x.product_name === selProduct);
-    const hasAny = (PRODUCT_MATERIALS[selProduct ?? ''] ?? []).some(m => getEnteredKg(m.name, m.source) > 0);
-    if (selProduct && hasAny) {
-      r = [...r].sort((a, b) => (calcMaxBatches(b) ?? -1) - (calcMaxBatches(a) ?? -1));
-    }
-    return r;
-  }, [listings, search, selProduct, partSel, stockInputs]);
 
   function parseMaterials(raw?: string): Record<string, { amount: number; unit: string }> {
     if (!raw) return {};
@@ -336,17 +297,188 @@ export default function ProducerListingsPage() {
     catch { return {}; }
   }
 
-  // ── ML tahmin — part + stock inputları birleştir ─────────────────────────
+  // ── Mevcut Stokla Kaç Birim / Paket Üretilebilir? ─────────────────────────
+  function calcMaxBatches(listing: ProducerListing): number | null {
+    const mats = parseMaterials(listing.required_materials);
+    const keys = Object.keys(mats);
+    if (keys.length === 0) return null;
+
+    let minBatches = Infinity;
+    for (const key of keys) {
+      const need = mats[key].amount;
+      if (!need || need <= 0) continue;
+      const def = (PRODUCT_MATERIALS[listing.product_name] ?? []).find(m => m.name === key);
+      const avail = getUnifiedAvail(key, def?.source);
+      const batches = avail / need;
+      if (batches < minBatches) {
+        minBatches = batches;
+      }
+    }
+    return isFinite(minBatches) && minBatches >= 0 ? minBatches : null;
+  }
+
+  // ── Filtrelenen İlanlar (Sadece İlan Listesini Etkiler) ──────────────────────
+  const displayed = useMemo(() => {
+    let r = listings;
+    if (search) {
+      const l = search.toLowerCase();
+      r = r.filter(x =>
+        x.product_name.toLowerCase().includes(l) ||
+        x.producer_name.toLowerCase().includes(l) ||
+        (x.description && x.description.toLowerCase().includes(l))
+      );
+    }
+    if (selProduct) {
+      r = r.filter(x => x.product_name === selProduct);
+    }
+    if (selAnimal) {
+      const allowedProducts = ANIMAL_PRODUCTS[selAnimal] ?? [];
+      r = r.filter(x => allowedProducts.includes(x.product_name));
+    }
+    return r;
+  }, [listings, search, selProduct, selAnimal]);
+
+  // ── Sipariş Modalı Açılış ───────────────────────────────────────────────────
+  function openOrder(listing: ProducerListing) {
+    setOrderListing(listing);
+    setOrderNote('');
+    setOrderAnimalFilter(null);
+
+    // Başlangıçta parçaları boşalt
+    setOrderPartKgs({});
+
+    // Diğer hammaddeler için varsayılan 0
+    const mats = parseMaterials(listing.required_materials);
+    const initialStockInputs: Record<string, number> = {};
+    Object.keys(mats).forEach(k => {
+      if (k.toLowerCase() !== 'et') {
+        initialStockInputs[k] = 0;
+      }
+    });
+    setOrderStockInputs(initialStockInputs);
+
+    setOrderOpen(true);
+    setDetailOpen(false);
+  }
+
+  // Sipariş Modalındaki Seçili Toplam Et
+  const orderSelectedMeatKg = useMemo(() => {
+    return Object.values(orderPartKgs).reduce((s, v) => s + (v || 0), 0);
+  }, [orderPartKgs]);
+
+  // Reçeteye göre diğer hammaddeleri otomatik doldurma
+  function autoFillStockInputs() {
+    if (!orderListing || orderSelectedMeatKg <= 0) return;
+    const mats = parseMaterials(orderListing.required_materials);
+    const etUnit = mats['Et']?.amount || 1.0;
+    const factor = orderSelectedMeatKg / etUnit;
+
+    const newInputs: Record<string, number> = {};
+    Object.entries(mats).forEach(([key, val]) => {
+      if (key.toLowerCase() !== 'et') {
+        const calculated = parseFloat((val.amount * factor).toFixed(2));
+        newInputs[key] = calculated;
+      }
+    });
+    setOrderStockInputs(newInputs);
+    msg.success('Reçete oranlarına göre diğer hammaddeler otomatik hesaplandı!');
+  }
+
+  // Sipariş Gönder (Gerçek parça adları ve lot_id'leri ile iletilir)
+  async function submitOrder() {
+    if (!orderListing) return;
+
+    if (orderSelectedMeatKg <= 0) {
+      msg.warning('Lütfen en az bir et parçasından miktar giriniz.');
+      return;
+    }
+
+    // Pastırma için uygunsuz parça kontrolü
+    if (orderListing.product_name === 'Pastırma') {
+      const hasUnsuitable = Object.entries(orderPartKgs).some(([partIdStr, kg]) => {
+        if (!kg || kg <= 0) return false;
+        const part = availParts.find(p => p.part_id === Number(partIdStr));
+        if (!part) return false;
+        const suit = getPartSuitability('Pastırma', part.part_name);
+        return suit.status === 'unsuitable';
+      });
+
+      if (hasUnsuitable) {
+        msg.error('Pastırma siparişinde kaburga/gerdan/bağırsak gibi kıymalık parçalar kullanılamaz! Lütfen Antrikot, Kontrfile veya Sokum seçiniz.');
+        return;
+      }
+    }
+
+    // 1 kg standart paket hesabı
+    const expectedPackages = Math.max(1, Math.round((orderSelectedMeatKg * 0.85) / 1.0));
+
+    // rawMaterials dizisi: gerçek parça adları ve lot ID'leri ile oluşturulur
+    const rawMaterials: { lot_id: number; material_type: string; quantity: number; unit: string; unit_price: number }[] = [];
+
+    // 1. Seçilen et parçalarını ekle
+    Object.entries(orderPartKgs).forEach(([partIdStr, kg]) => {
+      if (kg && kg > 0) {
+        const part = availParts.find(p => p.part_id === Number(partIdStr));
+        if (part) {
+          rawMaterials.push({
+            lot_id:        part.lot_id,
+            material_type: `${part.animal_type} - ${part.part_name}`,
+            quantity:      kg,
+            unit:          'kg',
+            unit_price:    0,
+          });
+        }
+      }
+    });
+
+    // 2. Diğer reçete malzemelerini ekle (Tuz, Sarımsak, Baharat, Bağırsak)
+    Object.entries(orderStockInputs).forEach(([matName, qty]) => {
+      if (qty && qty > 0) {
+        const matDef = (PRODUCT_MATERIALS[orderListing.product_name] ?? []).find(m => m.name === matName);
+        const stockItem = stock.find(s =>
+          s.material_type.toLocaleLowerCase('tr-TR') === matName.toLocaleLowerCase('tr-TR') ||
+          (matName.toLowerCase() === 'bağırsak' && s.material_type.toLowerCase().includes('bağırsak'))
+        );
+
+        rawMaterials.push({
+          lot_id:        stockItem?.lot_id ?? 0,
+          material_type: stockItem?.material_type ?? matName,
+          quantity:      qty,
+          unit:          matDef?.unit ?? 'kg',
+          unit_price:    stockItem?.unit_price ?? 0,
+        });
+      }
+    });
+
+    setOrderSubmitting(true);
+    try {
+      await orderService.create({
+        seller_id:    orderListing.producer_id,
+        listing_id:   orderListing.id,
+        expected_qty: expectedPackages,
+        notes:        orderNote || null,
+        rawMaterials,
+      });
+
+      msg.success(`Sipariş oluşturuldu! Seçilen ${rawMaterials.length} hammadde kalemi üreticiye iletildi.`);
+      setOrderOpen(false);
+    } catch (err: unknown) {
+      const errDetail = (err as { response?: { data?: { detail?: string; error?: string } } })?.response?.data;
+      const errMsg = errDetail?.detail || errDetail?.error || 'Sipariş oluşturulamadı. Lütfen tekrar deneyiniz.';
+      msg.error(errMsg);
+    } finally {
+      setOrderSubmitting(false);
+    }
+  }
+
+  // ── ML Tahmin Modalı ────────────────────────────────────────────────────────
   function openMl(listing: ProducerListing) {
-    const mats    = parseMaterials(listing.required_materials);
-    const matDefs = PRODUCT_MATERIALS[listing.product_name] ?? [];
+    const mats = parseMaterials(listing.required_materials);
     const inputs: Record<string, number> = {};
     Object.keys(mats).forEach(key => {
-      const def  = matDefs.find(m => m.name === key);
-      const have = def ? getEnteredKg(key, def.source) : 0;
-      // Filtreden değer geldiyse kullan, yoksa ilan'daki birim miktarı kullan
-      inputs[key] = have > 0 ? have : mats[key].amount;
+      inputs[key] = mats[key].amount || 1.0;
     });
+
     setMlListing(listing);
     setMlInputs(inputs);
     setMlResult(null);
@@ -372,406 +504,156 @@ export default function ProducerListingsPage() {
     }
   }
 
-  // ── Sipariş ──────────────────────────────────────────────────────────────
-  function openOrder(listing: ProducerListing) {
-    const mats    = parseMaterials(listing.required_materials);
-    const matDefs = PRODUCT_MATERIALS[listing.product_name] ?? [];
-    const inputs: Record<string, number> = {};
-    Object.keys(mats).forEach(key => {
-      const def  = matDefs.find(m => m.name === key);
-      const have = def ? getEnteredKg(key, def.source) : 0;
-      inputs[key] = have > 0 ? have : 0;
-    });
-    setOrderListing(listing);
-    setOrderInputs(inputs);
-    setOrderNote('');
-    setOrderOpen(true);
-    setDetailOpen(false);
-  }
-
-  async function submitOrder() {
-    if (!orderListing) return;
-    const matDefs = PRODUCT_MATERIALS[orderListing.product_name] ?? [];
-
-    // Toplam hammadde miktarı (Et bazlı — expected_qty)
-    const etInput = orderInputs['Et'] ?? 0;
-    const totalInput = Object.values(orderInputs).reduce((s, v) => s + (v || 0), 0);
-    const expectedQty = etInput > 0 ? etInput * 0.85 : totalInput * 0.85;
-
-    // rawMaterials: lot_id'si olan hammaddeler (parça lotları)
-    const rawMaterials: { lot_id: number; material_type: string; quantity: number; unit: string; unit_price: number }[] = [];
-
-    for (const [matName, qty] of Object.entries(orderInputs)) {
-      if (!qty || qty <= 0) continue;
-      const def = matDefs.find(m => m.name === matName);
-      if (!def) continue;
-
-      if (def.source === 'part') {
-        // Parça lotundan gelen — partSel'den lot_id al
-        const sel = partSel[matName];
-        // Et için seçili herhangi bir parça lot'u yoksa tüm seçili parçaları ekle
-        if (matName === 'Et') {
-          // Seçili tüm parçaları ayrı kalemler olarak ekle
-          Object.entries(partSel).forEach(([pName, pSel]) => {
-            if (pSel?.checked && pSel.kg > 0 && pSel.lot_id) {
-              rawMaterials.push({
-                lot_id:        pSel.lot_id,
-                material_type: pName,
-                quantity:      pSel.kg,
-                unit:          'kg',
-                unit_price:    0,
-              });
-            }
-          });
-        } else if (sel?.lot_id) {
-          rawMaterials.push({
-            lot_id:        sel.lot_id,
-            material_type: matName,
-            quantity:      qty,
-            unit:          def.unit,
-            unit_price:    0,
-          });
-        }
-      } else {
-        // Stok hammaddesi — lot_id bul (raw_materials tablosundan)
-        const stockItem = stock.find(s =>
-          s.material_type.toLocaleLowerCase('tr-TR') === matName.toLocaleLowerCase('tr-TR')
-        );
-        if (stockItem?.lot_id) {
-          rawMaterials.push({
-            lot_id:        stockItem.lot_id,
-            material_type: matName,
-            quantity:      qty,
-            unit:          def.unit,
-            unit_price:    stockItem.unit_price ?? 0,
-          });
-        }
-      }
-    }
-
-    setOrderSubmitting(true);
-    try {
-      await orderService.create({
-        seller_id:    orderListing.producer_id,
-        listing_id:   orderListing.id,
-        expected_qty: Math.round(expectedQty * 100) / 100,
-        notes:        orderNote || null,
-        rawMaterials,
-      });
-      msg.success('Sipariş oluşturuldu! Sucukçunun onayı bekleniyor.');
-      setOrderOpen(false);
-    } catch {
-      msg.error('Sipariş oluşturulamadı');
-    } finally {
-      setOrderSubmitting(false);
-    }
-  }
-
-  // ── Filtre paneli hesapları ──────────────────────────────────────────────
-  const filterMats  = PRODUCT_MATERIALS[selProduct ?? ''] ?? [];
-  const partMats    = filterMats.filter(m => m.source === 'part');
-  const stockMats   = filterMats.filter(m => m.source === 'stock');
-  const hasAnyInput = filterMats.some(m => getEnteredKg(m.name, m.source) > 0);
-  const allOk       = hasAnyInput && filterMats
-    .filter(m => getEnteredKg(m.name, m.source) > 0)
-    .every(m => getEnteredKg(m.name, m.source) <= getUnifiedAvail(m.name, m.source));
-
-  if (loading) return <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>;
+  // Filtre aktif mi kontrolü
+  const hasActiveFilters = Boolean(search || selProduct || selAnimal);
 
   return (
     <div>
-      {/* Başlık */}
+      {/* ── Başlık & Arama ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Title level={3} style={{ margin: 0 }}>🌭 Sucukçu İlanları</Title>
-        <Search placeholder="Ürün veya üretici ara..." allowClear style={{ width: 260 }}
-          prefix={<SearchOutlined />} value={search} onChange={e => setSearch(e.target.value)} />
+        <div>
+          <Title level={3} style={{ margin: 0 }}>🌭 Üretici İlanları & Fason Üretim</Title>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            Fason üretim yaptırmak istediğiniz ürünü seçin, kasaplık parçalarınızı lotlarıyla siparişe bağlayın.
+          </Text>
+        </div>
+        <Search
+          placeholder="İlan veya üretici ara..."
+          allowClear
+          style={{ width: 280 }}
+          prefix={<SearchOutlined />}
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
       </div>
 
-      {/* ── Filtre Paneli ── */}
-      <Card style={{ marginBottom: 20, borderRadius: 12, border: '1.5px solid #e8e8e8' }}
-        styles={{ body: { padding: '16px 20px' } }}>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <FilterOutlined style={{ color: '#1890ff' }} />
-          <Text strong>Üretim Planlama Filtresi</Text>
-          {hasAnyInput && (
-            <Tag color={allOk ? 'green' : 'orange'} style={{ marginLeft: 'auto' }}>
-              {allOk
-                ? <><CheckCircleOutlined /> Stok yeterli</>
-                : <><WarningOutlined /> Bazı hammaddeler yetersiz</>}
-            </Tag>
-          )}
-        </div>
-
-        {/* Adım 1: Ürün seç */}
-        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
-          1. Ne üretmek istiyorsunuz?
-        </Text>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-          {Object.entries(PRODUCT_META).map(([name, meta]) => {
-            const active = selProduct === name;
-            // Hayvan seçilmişse o hayvanda yapılamayan ürünleri devre dışı bırak
-            const allowed = selAnimal
-              ? (ANIMAL_PRODUCTS[selAnimal] ?? []).includes(name)
-              : true;
-            return (
-              <Tooltip key={name} title={!allowed ? `${ANIMAL_META[selAnimal!]?.label} ile ${name} yapılamaz` : ''}>
-                <div
-                  onClick={() => allowed && onProductSelect(active ? null : name)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '6px 16px', borderRadius: 20,
-                    cursor: allowed ? 'pointer' : 'not-allowed',
-                    border: `1.5px solid ${active ? meta.color : '#d9d9d9'}`,
-                    background: active ? '#fafafa' : allowed ? '#fff' : '#f5f5f5',
-                    fontWeight: active ? 700 : 400,
-                    color: active ? meta.color : allowed ? '#595959' : '#bfbfbf',
-                    transition: 'all 0.15s', userSelect: 'none',
-                    opacity: allowed ? 1 : 0.45,
-                  }}
-                >
-                  <span style={{ fontSize: 16 }}>{meta.emoji}</span>
-                  <span style={{ fontSize: 13 }}>{name}</span>
-                </div>
-              </Tooltip>
-            );
-          })}
-          {selProduct && (
-            <Button size="small" type="text" onClick={() => onProductSelect(null)}
-              style={{ color: '#999', alignSelf: 'center' }}>Temizle ✕</Button>
-          )}
-        </div>
-
-        {/* Adım 2: Hayvan türü seç */}
-        {selProduct && partMats.length > 0 && (
-          <>
-            <Divider style={{ margin: '0 0 12px' }} />
-            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
-              2. Hangi hayvandan et / parça kullanacaksınız?
+      {/* ── SADELEŞTİRİLMİŞ İLAN FİLTRESİ (Sadece Filtreleme Yapar) ── */}
+      <Card
+        style={{ marginBottom: 20, borderRadius: 12, border: '1.5px solid #e8e8e8', background: '#fafafa' }}
+        styles={{ body: { padding: '14px 20px' } }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <Space>
+            <FilterOutlined style={{ color: '#1890ff', fontSize: 16 }} />
+            <Text strong style={{ fontSize: 14 }}>İlan Filtreleme</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              ({displayed.length} ilan listeleniyor · Depoda toplam {totalAvailMeatKg.toFixed(1)} kg et mevcut)
             </Text>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-              {Object.entries(ANIMAL_META)
-                .filter(([key]) =>
-                  // Seçili ürünle uyumsuz hayvanları listede gösterme
-                  !selProduct || (ANIMAL_PRODUCTS[key] ?? []).includes(selProduct)
-                )
-                .map(([key, meta]) => {
-                const active   = selAnimal === key;
-                const hasStock = availParts.some(p =>
-                  p.animal_type.toLocaleLowerCase('tr-TR') === key && Number(p.available_kg) > 0
-                );
-                const totalKg  = availParts
-                  .filter(p => p.animal_type.toLocaleLowerCase('tr-TR') === key)
-                  .reduce((s, p) => s + Number(p.available_kg), 0);
+          </Space>
+          {hasActiveFilters && (
+            <Button
+              size="small"
+              type="link"
+              danger
+              icon={<ClearOutlined />}
+              onClick={() => { setSearch(''); setSelProduct(null); setSelAnimal(null); }}
+            >
+              Filtreleri Temizle
+            </Button>
+          )}
+        </div>
+
+        <Row gutter={[20, 10]} align="middle">
+          {/* Ürün Filtresi */}
+          <Col xs={24} md={14}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <Text type="secondary" style={{ fontSize: 12, minWidth: 65 }}>Ürün Türü:</Text>
+              <div
+                onClick={() => setSelProduct(null)}
+                style={{
+                  padding: '4px 12px', borderRadius: 16, cursor: 'pointer',
+                  border: `1.5px solid ${!selProduct ? '#1890ff' : '#d9d9d9'}`,
+                  background: !selProduct ? '#e6f4ff' : '#fff',
+                  color: !selProduct ? '#1890ff' : '#595959',
+                  fontWeight: !selProduct ? 600 : 400,
+                  fontSize: 12, transition: 'all 0.15s',
+                }}
+              >
+                Tümü ({listings.length})
+              </div>
+              {Object.entries(PRODUCT_META).map(([name, meta]) => {
+                const active = selProduct === name;
+                const count = listings.filter(l => l.product_name === name).length;
                 return (
-                  <Tooltip key={key} title={!hasStock ? 'Bu türde aktif parça lotu yok' : ''}>
-                    <div onClick={() => hasStock && onAnimalSelect(active ? null : key)} style={{
-                      display: 'flex', alignItems: 'center', gap: 6,
-                      padding: '6px 16px', borderRadius: 20,
-                      cursor: hasStock ? 'pointer' : 'not-allowed',
-                      border: `1.5px solid ${active ? '#1890ff' : '#d9d9d9'}`,
-                      background: active ? '#e6f4ff' : hasStock ? '#fff' : '#f5f5f5',
+                  <div
+                    key={name}
+                    onClick={() => setSelProduct(active ? null : name)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '4px 12px', borderRadius: 16, cursor: 'pointer',
+                      border: `1.5px solid ${active ? meta.color : '#d9d9d9'}`,
+                      background: active ? '#fff' : '#fff',
+                      color: active ? meta.color : '#595959',
                       fontWeight: active ? 700 : 400,
-                      color: active ? '#1890ff' : hasStock ? '#595959' : '#bfbfbf',
-                      transition: 'all 0.15s', userSelect: 'none',
-                    }}>
-                      <span style={{ fontSize: 16 }}>{meta.emoji}</span>
-                      <span style={{ fontSize: 13 }}>{meta.label}</span>
-                      {hasStock && (
-                        <Tag color="blue" style={{ fontSize: 10, marginLeft: 2 }}>
-                          {totalKg.toFixed(0)} kg
-                        </Tag>
-                      )}
-                    </div>
-                  </Tooltip>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {/* Adım 3: Parça seçimi — seçilen hayvandaki TÜM aktif parçalar listelenir */}
-        {selProduct && selAnimal && (
-          <>
-            <Divider style={{ margin: '0 0 12px' }} />
-            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 10 }}>
-              3. Gönderilecek parçaları seçin ve miktarlarını girin:
-            </Text>
-
-            {/* Adım 3: Sadece 'part' kaynaklı hammadde adlarıyla (yani Et) eşleşen parçalar */}
-            {(() => {
-              // Hangi parça adları 'stock' tanımlı → bunları Adım 3'ten kesinlikle çıkar
-              // toLocaleLowerCase('tr-TR') ile Türkçe karakter güvenli karşılaştırma
-              const stockMatNames = new Set(
-                (PRODUCT_MATERIALS[selProduct] ?? [])
-                  .filter(m => m.source === 'stock')
-                  .map(m => m.name.toLocaleLowerCase('tr-TR'))
-              );
-
-              const partsOfAnimal = Array.from(new Set(
-                availParts
-                  .filter(p =>
-                    p.animal_type.toLocaleLowerCase('tr-TR') === selAnimal.toLocaleLowerCase('tr-TR') &&
-                    Number(p.available_kg) > 0 &&
-                    !stockMatNames.has(p.part_name.toLocaleLowerCase('tr-TR'))
-                  )
-                  .map(p => p.part_name)
-              ));
-
-              if (partsOfAnimal.length === 0) {
-                return (
-                  <Alert type="warning" message="Bu hayvana ait aktif parça lotu bulunamadı." showIcon />
-                );
-              }
-
-              return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {partsOfAnimal.map(partName => {
-                    const lots    = getPartLots(partName);
-                    const avail   = getPartAvail(partName);
-                    const sel     = partSel[partName];
-                    const checked = sel?.checked ?? false;
-                    const kg      = sel?.kg ?? 0;
-                    const ok      = !checked || kg <= avail;
-
-                    return (
-                      <div key={partName} style={{
-                        display: 'flex', alignItems: 'center', gap: 12,
-                        padding: '10px 14px', background: checked ? '#f6ffed' : '#fafafa',
-                        borderRadius: 10,
-                        border: `1.5px solid ${checked && !ok ? '#ffbb96' : checked ? '#b7eb8f' : '#f0f0f0'}`,
-                        transition: 'all 0.15s',
-                      }}>
-                        {/* Checkbox */}
-                        <Checkbox
-                          checked={checked}
-                          onChange={e => {
-                            const defaultLot = lots[0];
-                            setPartSel(prev => ({
-                              ...prev,
-                              [partName]: {
-                                lot_id:  prev[partName]?.lot_id ?? defaultLot?.lot_id ?? 0,
-                                kg:      prev[partName]?.kg ?? Math.min(avail, 10),
-                                checked: e.target.checked,
-                              },
-                            }));
-                          }}
-                        />
-
-                        {/* Parça adı + stok */}
-                        <div style={{ minWidth: 130 }}>
-                          <Text style={{ fontWeight: checked ? 600 : 400 }}>{partName}</Text>
-                          <div style={{ fontSize: 11, color: '#888' }}>
-                            Depoda: {avail.toFixed(2)} kg
-                          </div>
-                        </div>
-
-                        {/* Lot seçimi (birden fazla lotsa) */}
-                        {checked && lots.length > 1 && (
-                          <Select
-                            size="small"
-                            style={{ width: 200 }}
-                            value={sel?.lot_id}
-                            placeholder="Lot seç"
-                            onChange={lotId => {
-                              setPartSel(prev => ({
-                                ...prev,
-                                [partName]: { ...prev[partName]!, lot_id: lotId },
-                              }));
-                            }}
-                            options={lots.map(l => ({
-                              value: l.lot_id,
-                              label: `${l.lot_number} — ${Number(l.available_kg).toFixed(1)} kg`,
-                            }))}
-                          />
-                        )}
-                        {checked && lots.length === 1 && (
-                          <Text style={{ fontSize: 11, color: '#888', minWidth: 120 }}>
-                            {lots[0].lot_number}
-                          </Text>
-                        )}
-
-                        {/* Miktar girişi */}
-                        {checked && (
-                          <InputNumber
-                            size="small"
-                            min={0} max={avail} step={0.1} precision={2}
-                            value={kg || null}
-                            onChange={v => {
-                              setPartSel(prev => ({
-                                ...prev,
-                                [partName]: { ...prev[partName]!, kg: v ?? 0 },
-                              }));
-                            }}
-                            addonAfter="kg"
-                            style={{ width: 140 }}
-                          />
-                        )}
-
-                        {/* Stok durumu */}
-                        {checked && (
-                          ok
-                            ? <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 16 }} />
-                            : <Tooltip title={`${(kg - avail).toFixed(2)} kg eksik`}>
-                                <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: 16 }} />
-                              </Tooltip>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
-          </>
-        )}
-
-        {/* Adım 4: Diğer hammaddeler (stock) */}
-        {selProduct && stockMats.length > 0 && (
-          <>
-            <Divider style={{ margin: '12px 0' }} />
-            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 10 }}>
-              {partMats.length > 0 ? '4.' : '2.'} Diğer hammaddelerden ne kadar kullanacaksınız?
-            </Text>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {stockMats.map(mat => {
-                const entered = stockInputs[mat.name] ?? 0;
-                const avail   = stockMap[mat.name.toLowerCase().trim()] ?? 0;
-                const ok      = entered <= avail;
-                return (
-                  <div key={mat.name} style={{
-                    padding: '10px 12px', background: '#fafafa', borderRadius: 10,
-                    border: `1px solid ${entered > 0 && !ok ? '#ffbb96' : '#f0f0f0'}`,
-                    minWidth: 160,
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: 600 }}>{mat.name}</Text>
-                      {entered > 0 && (ok
-                        ? <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                        : <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
-                      )}
-                    </div>
-                    <InputNumber size="small" min={0} step={0.1} precision={2} placeholder="0.00"
-                      value={stockInputs[mat.name] ?? null}
-                      onChange={v => setStockInputs(prev => ({ ...prev, [mat.name]: v ?? 0 }))}
-                      addonAfter={mat.unit} style={{ width: '100%' }} />
-                    <Text style={{
-                      fontSize: 11, marginTop: 4, display: 'block',
-                      color: !stockLoading && entered > 0 ? (ok ? '#52c41a' : '#ff4d4f') : '#8c8c8c',
-                    }}>
-                      Depoda: {stockLoading ? '…' : `${avail.toFixed(2)} ${mat.unit}`}
-                      {entered > 0 && !ok && ` (${(entered - avail).toFixed(2)} eksik)`}
-                    </Text>
+                      fontSize: 12, transition: 'all 0.15s',
+                    }}
+                  >
+                    <span>{meta.emoji}</span>
+                    <span>{name}</span>
+                    <Tag style={{ marginLeft: 2, fontSize: 10, padding: '0 4px' }} bordered={false}>{count}</Tag>
                   </div>
                 );
               })}
             </div>
-          </>
-        )}
+          </Col>
+
+          {/* Hayvan Türü Uyumu Filtresi */}
+          <Col xs={24} md={10}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <Text type="secondary" style={{ fontSize: 12, minWidth: 75 }}>Hayvan Türü:</Text>
+              <div
+                onClick={() => setSelAnimal(null)}
+                style={{
+                  padding: '4px 12px', borderRadius: 16, cursor: 'pointer',
+                  border: `1.5px solid ${!selAnimal ? '#1890ff' : '#d9d9d9'}`,
+                  background: !selAnimal ? '#e6f4ff' : '#fff',
+                  color: !selAnimal ? '#1890ff' : '#595959',
+                  fontWeight: !selAnimal ? 600 : 400,
+                  fontSize: 12, transition: 'all 0.15s',
+                }}
+              >
+                Fark Etmez
+              </div>
+              {Object.entries(ANIMAL_META).map(([key, meta]) => {
+                const active = selAnimal === key;
+                const animalMeatKg = availParts
+                  .filter(p => p.animal_type.toLocaleLowerCase('tr-TR') === key)
+                  .reduce((s, p) => s + Number(p.available_kg), 0);
+
+                return (
+                  <div
+                    key={key}
+                    onClick={() => setSelAnimal(active ? null : key)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '4px 12px', borderRadius: 16, cursor: 'pointer',
+                      border: `1.5px solid ${active ? '#1890ff' : '#d9d9d9'}`,
+                      background: active ? '#e6f4ff' : '#fff',
+                      color: active ? '#1890ff' : '#595959',
+                      fontWeight: active ? 600 : 400,
+                      fontSize: 12, transition: 'all 0.15s',
+                    }}
+                  >
+                    <span>{meta.emoji}</span>
+                    <span>{meta.label}</span>
+                    {animalMeatKg > 0 && (
+                      <Tag color="cyan" style={{ fontSize: 9, marginLeft: 2, padding: '0 4px' }}>
+                        {animalMeatKg.toFixed(0)} kg
+                      </Tag>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Col>
+        </Row>
       </Card>
 
-      {/* ── İlan Listesi ── */}
-      {displayed.length === 0 ? (
-        <Empty description={selProduct ? `${selProduct} için aktif ilan bulunamadı` : 'Henüz ilan yok'} />
+      {/* ── İLAN LİSTESİ ── */}
+      {loading || stockLoading ? (
+        <Card style={{ textAlign: 'center', padding: 40 }}><Text type="secondary">İlanlar ve stok bilgileri yükleniyor...</Text></Card>
+      ) : displayed.length === 0 ? (
+        <Empty description={selProduct ? `${selProduct} için aktif ilan bulunamadı` : 'Kriterlere uygun ilan bulunamadı'} />
       ) : (
         <Row gutter={[16, 16]}>
           {displayed.map(listing => {
@@ -783,57 +665,68 @@ export default function ProducerListingsPage() {
 
             return (
               <Col key={listing.id} xs={24} sm={12} lg={8}>
-                <Card hoverable style={{ borderRadius: 12, height: '100%', position: 'relative' }}
-                  styles={{ body: { padding: '16px 20px' } }}
-                  onClick={() => openOrder(listing)}>
-
-                  {batches !== null && batches > 0 && (
+                <Card
+                  hoverable
+                  style={{ borderRadius: 12, height: '100%', position: 'relative', display: 'flex', flexDirection: 'column' }}
+                  styles={{ body: { padding: '16px 20px', display: 'flex', flexDirection: 'column', height: '100%' } }}
+                  onClick={() => openOrder(listing)}
+                >
+                  {/* Kapasite rozeti */}
+                  {batches !== null && (
                     <div style={{
-                      position: 'absolute', top: 10, right: 10,
-                      background: allOk ? '#52c41a' : '#faad14',
+                      position: 'absolute', top: 12, right: 12,
+                      background: batches > 0 ? '#52c41a' : '#ff4d4f',
                       color: '#fff', borderRadius: 10, padding: '2px 8px', fontSize: 11, fontWeight: 700,
                     }}>
-                      ≈ {batches.toFixed(1)} birim
+                      {batches > 0 ? `≈ ${Math.floor(batches)} paket kapasite` : 'Stok yetersiz'}
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                     <div style={{
-                      fontSize: 28, width: 52, height: 52, background: '#f5f5f5',
+                      fontSize: 28, width: 50, height: 50, background: '#f5f5f5',
                       borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>{meta.emoji}</div>
                     <div>
                       <Text strong style={{ fontSize: 16 }}>{listing.product_name}</Text><br />
                       <Text type="secondary" style={{ fontSize: 12 }}>{listing.producer_name}</Text>
                     </div>
-                    <div style={{ marginLeft: 'auto' }}>
-                      <Tag color={meta.color} style={{ fontSize: 13, padding: '2px 10px' }}>
-                        {Number(listing.service_price).toFixed(2)} € / {listing.service_unit}
-                      </Tag>
-                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: 10 }}>
+                    <Tag color={meta.color} style={{ fontSize: 13, padding: '2px 10px', fontWeight: 600 }}>
+                      {Number(listing.service_price).toFixed(2)} € / {listing.service_unit}
+                    </Tag>
+                    {listing.min_order_qty && (
+                      <Tag style={{ fontSize: 11 }}>Min. {listing.min_order_qty} {listing.service_unit}</Tag>
+                    )}
                   </div>
 
                   {listing.description && (
-                    <Text type="secondary" style={{ fontSize: 13, display: 'block', marginBottom: 10 }}>
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12, flex: '1 0 auto' }}>
                       {listing.description}
                     </Text>
                   )}
 
+                  {/* Reçete ve Stok Durumu Önizlemesi */}
                   {matKeys.length > 0 && (
-                    <div style={{ marginBottom: 12 }}>
-                      <Text style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 4 }}>
-                        Birim başına gereken:
+                    <div style={{ marginBottom: 12, marginTop: 'auto' }}>
+                      <Text style={{ fontSize: 11, color: '#888', display: 'block', marginBottom: 4 }}>
+                        Birim İhtiyaç & Depodaki Stok:
                       </Text>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                         {matKeys.map(key => {
                           const need  = mats[key].amount;
                           const def   = matDefs.find(m => m.name === key);
-                          const have  = def ? getEnteredKg(key, def.source) : 0;
-                          const maxB  = have > 0 && need > 0 ? Math.floor(have / need) : null;
-                          const color = maxB === null ? 'default' : maxB > 0 ? 'green' : 'red';
+                          const avail = getUnifiedAvail(key, def?.source);
+                          const isOk  = avail >= need;
                           return (
-                            <Tag key={key} color={color} style={{ fontSize: 11 }}>
-                              {key}: {need} {mats[key].unit}{maxB !== null && ` · ${maxB}×`}
+                            <Tag
+                              key={key}
+                              color={isOk ? 'green' : 'orange'}
+                              style={{ fontSize: 11, padding: '1px 6px' }}
+                            >
+                              {key}: {need} {mats[key].unit} <span style={{ opacity: 0.75 }}>({avail.toFixed(0)} stok)</span>
                             </Tag>
                           );
                         })}
@@ -841,24 +734,39 @@ export default function ProducerListingsPage() {
                     </div>
                   )}
 
+                  {/* Alt İşlem Butonları */}
                   <div style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    marginTop: 8, paddingTop: 8, borderTop: '1px solid #f0f0f0',
+                    marginTop: 8, paddingTop: 10, borderTop: '1px solid #f0f0f0',
                   }}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      {listing.min_order_qty ? `Min: ${listing.min_order_qty} ${listing.service_unit}` : 'Min. sipariş yok'}
-                    </Text>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <Tooltip title="AI Üretim Tahmini">
-                        <Button size="small" icon={<RobotOutlined />}
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={<ShoppingCartOutlined />}
+                      onClick={e => { e.stopPropagation(); openOrder(listing); }}
+                    >
+                      Sipariş Ver
+                    </Button>
+
+                    <Space size={4}>
+                      <Tooltip title="AI Çıktı & EKP Tahmini">
+                        <Button
+                          size="small"
+                          icon={<RobotOutlined />}
                           style={{ color: '#722ed1', borderColor: '#722ed1' }}
-                          onClick={e => { e.stopPropagation(); openMl(listing); }}>Tahmin</Button>
+                          onClick={e => { e.stopPropagation(); openMl(listing); }}
+                        >
+                          Tahmin
+                        </Button>
                       </Tooltip>
-                      <Button size="small" icon={<InfoCircleOutlined />}
-                        onClick={e => { e.stopPropagation(); setSelListing(listing); setDetailOpen(true); }}>
+                      <Button
+                        size="small"
+                        icon={<InfoCircleOutlined />}
+                        onClick={e => { e.stopPropagation(); setSelListing(listing); setDetailOpen(true); }}
+                      >
                         Detay
                       </Button>
-                    </div>
+                    </Space>
                   </div>
                 </Card>
               </Col>
@@ -867,225 +775,428 @@ export default function ProducerListingsPage() {
         </Row>
       )}
 
-      {/* ── Detay Modalı ── */}
-      <Modal open={detailOpen} onCancel={() => setDetailOpen(false)}
+      {/* ── DETAY MODALI ── */}
+      <Modal
+        open={detailOpen}
+        onCancel={() => setDetailOpen(false)}
         footer={null}
-        width={520}
+        width={560}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 22 }}>{selListing ? (PRODUCT_META[selListing.product_name]?.emoji ?? '📦') : ''}</span>
+            <span style={{ fontSize: 24 }}>{selListing ? (PRODUCT_META[selListing.product_name]?.emoji ?? '📦') : ''}</span>
             <span>{selListing?.product_name} — İlan Detayı</span>
           </div>
         }
       >
         {selListing && (() => {
-          const mats    = parseMaterials(selListing.required_materials);
-          const keys    = Object.keys(mats);
+          const mats = parseMaterials(selListing.required_materials);
+          const keys = Object.keys(mats);
           const matDefs = PRODUCT_MATERIALS[selListing.product_name] ?? [];
           return (
             <div>
               <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
-                <Descriptions.Item label="Üretici" span={2}><Text strong>{selListing.producer_name}</Text></Descriptions.Item>
-                {selListing.phone && <Descriptions.Item label={<><PhoneOutlined /> Telefon</>} span={2}>{selListing.phone}</Descriptions.Item>}
-                {selListing.address && <Descriptions.Item label={<><EnvironmentOutlined /> Adres</>} span={2}>{selListing.address}</Descriptions.Item>}
+                <Descriptions.Item label="Üretici" span={2}>
+                  <Text strong>{selListing.producer_name}</Text>
+                </Descriptions.Item>
+                {selListing.phone && (
+                  <Descriptions.Item label={<><PhoneOutlined /> Telefon</>} span={2}>
+                    {selListing.phone}
+                  </Descriptions.Item>
+                )}
+                {selListing.address && (
+                  <Descriptions.Item label={<><EnvironmentOutlined /> Adres</>} span={2}>
+                    {selListing.address}
+                  </Descriptions.Item>
+                )}
                 <Descriptions.Item label="Hizmet Fiyatı">
-                  <Text strong style={{ color: '#f50' }}>{Number(selListing.service_price).toFixed(2)} € / {selListing.service_unit}</Text>
+                  <Text strong style={{ color: '#f50', fontSize: 15 }}>
+                    {Number(selListing.service_price).toFixed(2)} € / {selListing.service_unit}
+                  </Text>
                 </Descriptions.Item>
                 <Descriptions.Item label="Min. Sipariş">
-                  {selListing.min_order_qty ? `${selListing.min_order_qty} ${selListing.service_unit}` : '—'}
+                  {selListing.min_order_qty ? `${selListing.min_order_qty} ${selListing.service_unit}` : 'Yok'}
                 </Descriptions.Item>
               </Descriptions>
+
               {selListing.description && (
-                <div style={{ marginBottom: 16, padding: '10px 12px', background: '#f9f9f9', borderRadius: 8 }}>
+                <div style={{ marginBottom: 16, padding: '10px 14px', background: '#f9f9f9', borderRadius: 8 }}>
                   <Text type="secondary">{selListing.description}</Text>
                 </div>
               )}
+
               {keys.length > 0 && (
                 <>
-                  <Divider style={{ margin: '12px 0' }}>Birim Başına Gereken Hammaddeler</Divider>
+                  <Divider style={{ margin: '14px 0 10px' }}>Birim Başına İstenen Hammaddeler</Divider>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {keys.map(key => {
                       const def   = matDefs.find(m => m.name === key);
-                      const have  = def ? getEnteredKg(key, def.source) : 0;
-                      const avail = def ? getUnifiedAvail(key, def.source) : 0;
+                      const avail = getUnifiedAvail(key, def?.source);
                       return (
                         <div key={key} style={{
                           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                          padding: '6px 12px', background: '#fafafa', borderRadius: 6,
-                          border: `1px solid ${have > 0 && have > avail ? '#ffbb96' : '#f0f0f0'}`,
+                          padding: '8px 12px', background: '#fafafa', borderRadius: 6,
+                          border: '1px solid #f0f0f0',
                         }}>
-                          <Text>{key}</Text>
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <Text strong>{key}</Text>
+                          <Space>
                             <Tag color="blue">{mats[key].amount} {mats[key].unit}</Tag>
-                            {have > 0 && !stockLoading && (
-                              <Tag color={have <= avail ? 'green' : 'red'} style={{ fontSize: 11 }}>
-                                Depoda: {avail.toFixed(1)} {mats[key].unit}
-                              </Tag>
-                            )}
-                          </div>
+                            <Tag color={avail >= mats[key].amount ? 'green' : 'orange'}>
+                              Depoda: {avail.toFixed(1)} {mats[key].unit}
+                            </Tag>
+                          </Space>
                         </div>
                       );
                     })}
                   </div>
                 </>
               )}
-              <div style={{ marginTop: 16, padding: '8px 12px', background: '#fffbe6', borderRadius: 8, border: '1px solid #ffe58f' }}>
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  💡 Sipariş verdiğinizde bu hammaddeleri sucukçuya göndermeniz gerekecektir.
-                </Text>
-              </div>
-            </div>
-          );
-        })()}
-      </Modal>
-
-      {/* ── Sipariş Modalı ── */}
-      <Modal
-        open={orderOpen}
-        onCancel={() => setOrderOpen(false)}
-        footer={null}
-        width={600}
-        centered
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ShoppingCartOutlined style={{ color: '#1890ff', fontSize: 20 }} />
-            <span>{orderListing?.product_name} — Sipariş Ver</span>
-            <Tag color="blue" style={{ marginLeft: 4 }}>{orderListing?.producer_name}</Tag>
-          </div>
-        }
-      >
-        {orderListing && (() => {
-          const mats    = parseMaterials(orderListing.required_materials);
-          const matDefs = PRODUCT_MATERIALS[orderListing.product_name] ?? [];
-          const totalEt = orderInputs['Et'] ?? 0;
-          const expectedQty = totalEt > 0 ? totalEt * 0.85 : 0;
-
-          return (
-            <div>
-              {/* Üretici bilgileri */}
-              <div style={{
-                background: '#f0f5ff', borderRadius: 10, padding: '12px 16px',
-                marginBottom: 16, border: '1px solid #adc6ff',
-              }}>
-                <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                  <div>
-                    <Text type="secondary" style={{ fontSize: 11 }}>Üretici</Text>
-                    <div style={{ fontWeight: 700 }}>{orderListing.producer_name}</div>
-                  </div>
-                  {orderListing.phone && (
-                    <div>
-                      <Text type="secondary" style={{ fontSize: 11 }}>Telefon</Text>
-                      <div><PhoneOutlined style={{ marginRight: 4 }} />{orderListing.phone}</div>
-                    </div>
-                  )}
-                  {orderListing.address && (
-                    <div>
-                      <Text type="secondary" style={{ fontSize: 11 }}>Adres</Text>
-                      <div><EnvironmentOutlined style={{ marginRight: 4 }} />{orderListing.address}</div>
-                    </div>
-                  )}
-                  <div>
-                    <Text type="secondary" style={{ fontSize: 11 }}>Hizmet Fiyatı</Text>
-                    <div style={{ color: '#f50', fontWeight: 700 }}>
-                      {Number(orderListing.service_price).toFixed(2)} € / {orderListing.service_unit}
-                    </div>
-                  </div>
-                  {orderListing.min_order_qty && (
-                    <div>
-                      <Text type="secondary" style={{ fontSize: 11 }}>Min. Sipariş</Text>
-                      <div>{orderListing.min_order_qty} {orderListing.service_unit}</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <Divider style={{ margin: '0 0 14px' }}>Göndereceğiniz Hammaddeler</Divider>
-
-              {/* Hammadde miktarları */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-                {Object.keys(mats).map(key => {
-                  const def   = matDefs.find(m => m.name === key);
-                  const avail = def ? getUnifiedAvail(key, def.source) : 0;
-                  const qty   = orderInputs[key] ?? 0;
-                  const ok    = qty <= avail;
-                  const need  = mats[key].amount;
-
-                  return (
-                    <div key={key} style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '8px 12px', background: '#fafafa', borderRadius: 8,
-                      border: `1px solid ${qty > 0 && !ok ? '#ffbb96' : '#f0f0f0'}`,
-                    }}>
-                      <div style={{ minWidth: 160 }}>
-                        <Text style={{ fontWeight: 500 }}>{key}</Text>
-                        <div style={{ fontSize: 11, color: '#888' }}>
-                          Birim başına: {need} {mats[key].unit} · Depoda: {avail.toFixed(2)} {mats[key].unit}
-                        </div>
-                        {qty > 0 && !ok && (
-                          <div style={{ fontSize: 11, color: '#ff4d4f' }}>
-                            ⚠ Stok yetersiz ({(qty - avail).toFixed(2)} {mats[key].unit} eksik)
-                          </div>
-                        )}
-                      </div>
-                      <InputNumber
-                        min={0} step={0.1} precision={2}
-                        value={orderInputs[key] ?? null}
-                        onChange={v => setOrderInputs(prev => ({ ...prev, [key]: v ?? 0 }))}
-                        addonAfter={mats[key].unit}
-                        style={{ width: 160 }}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Beklenen çıktı tahmini */}
-              {expectedQty > 0 && (
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '10px 14px', background: '#f6ffed', borderRadius: 8,
-                  border: '1px solid #b7eb8f', marginBottom: 16,
-                }}>
-                  <Text type="secondary">Tahmini mamul çıktı (%85 verim)</Text>
-                  <Text strong style={{ color: '#52c41a', fontSize: 16 }}>
-                    ≈ {expectedQty.toFixed(1)} kg
-                  </Text>
-                </div>
-              )}
-
-              {/* Not */}
-              <div style={{ marginBottom: 16 }}>
-                <Text style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>Not (opsiyonel)</Text>
-                <Input.TextArea
-                  rows={2}
-                  placeholder="Sucukçuya iletmek istediğiniz not..."
-                  value={orderNote}
-                  onChange={e => setOrderNote(e.target.value)}
-                />
-              </div>
-
-              <Alert
-                type="warning" showIcon style={{ marginBottom: 16, fontSize: 12 }}
-                message="Sipariş sucukçu tarafından onaylandığında hammaddeler stoğunuzdan otomatik düşülecektir."
-              />
 
               <Button
-                type="primary" block size="large" icon={<ShoppingCartOutlined />}
-                loading={orderSubmitting}
-                disabled={Object.values(orderInputs).every(v => !v || v <= 0)}
-                onClick={submitOrder}
-                style={{ borderRadius: 8 }}
+                type="primary"
+                block
+                size="large"
+                icon={<ShoppingCartOutlined />}
+                style={{ marginTop: 20 }}
+                onClick={() => openOrder(selListing)}
               >
-                Siparişi Gönder
+                Bu İlandan Sipariş Ver
               </Button>
             </div>
           );
         })()}
       </Modal>
 
-      {/* ── ML Tahmin Modalı ── */}
-      <Modal open={mlOpen} onCancel={() => { setMlOpen(false); setMlResult(null); }}
-        footer={null} width={560} centered
+      {/* ── SİPARİŞ MODALI (Parça Seçimi, Lot Bağlantısı & Uyum Kontrolü Burada) ── */}
+      <Modal
+        open={orderOpen}
+        onCancel={() => setOrderOpen(false)}
+        footer={null}
+        width={720}
+        centered
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ShoppingCartOutlined style={{ color: '#1890ff', fontSize: 20 }} />
+            <span>{orderListing?.product_name} — Fason Üretim Siparişi</span>
+            <Tag color="blue" style={{ marginLeft: 4 }}>{orderListing?.producer_name}</Tag>
+          </div>
+        }
+      >
+        {orderListing && (() => {
+          const mats = parseMaterials(orderListing.required_materials);
+          const stockMatKeys = Object.keys(mats).filter(k => k.toLowerCase() !== 'et');
+          const totalStockInput = Object.values(orderStockInputs).reduce((s, v) => s + (v || 0), 0);
+          const totalInputKg = orderSelectedMeatKg + totalStockInput;
+          const expectedPackages = orderSelectedMeatKg > 0 ? Math.max(1, Math.round((orderSelectedMeatKg * 0.85) / 1.0)) : 0;
+          const estimatedFire = totalInputKg > 0 ? Math.max(0, parseFloat((totalInputKg - (expectedPackages * 1.0)).toFixed(2))) : 0;
+          const estimatedCost = (expectedPackages * Number(orderListing.service_price)).toFixed(2);
+
+          // Mezbaha aktif parçaları
+          const activeParts = availParts.filter(p => Number(p.available_kg) > 0);
+
+          // İsteğe bağlı modal içi hayvan filtreleme
+          const filteredParts = orderAnimalFilter
+            ? activeParts.filter(p => p.animal_type.toLocaleLowerCase('tr-TR') === orderAnimalFilter.toLocaleLowerCase('tr-TR'))
+            : activeParts;
+
+          return (
+            <div>
+              {/* Üretici özet kartı */}
+              <div style={{
+                background: '#f0f5ff', borderRadius: 8, padding: '10px 14px',
+                marginBottom: 16, border: '1px solid #adc6ff',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+              }}>
+                <div>
+                  <Text strong>{orderListing.producer_name}</Text>
+                  {orderListing.phone && <Text type="secondary" style={{ marginLeft: 12 }}><PhoneOutlined /> {orderListing.phone}</Text>}
+                </div>
+                <div>
+                  <Text type="secondary">Hizmet Bedeli: </Text>
+                  <Text strong style={{ color: '#f50', fontSize: 15 }}>
+                    {Number(orderListing.service_price).toFixed(2)} € / {orderListing.service_unit}
+                  </Text>
+                </div>
+              </div>
+
+              {/* ── BÖLÜM 1: ET VE PARÇA SEÇİMİ (MEZBAHA STOĞU) ── */}
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div>
+                    <Text strong style={{ fontSize: 14 }}>1. Mezbaha Parça ve Lot Seçimi (Et)</Text>
+                    <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
+                      Hangi hayvanın hangi parça lotlarını üreticiye göndereceğinizi belirleyin.
+                    </Text>
+                  </div>
+                  {activeParts.length > 0 && (
+                    <Space size={4}>
+                      <Button
+                        size="small"
+                        type={orderAnimalFilter === null ? 'primary' : 'default'}
+                        onClick={() => setOrderAnimalFilter(null)}
+                      >
+                        Tümü
+                      </Button>
+                      {['inek', 'koyun', 'tavuk'].map(a => {
+                        const cnt = activeParts.filter(p => p.animal_type.toLocaleLowerCase('tr-TR') === a).length;
+                        if (cnt === 0) return null;
+                        return (
+                          <Button
+                            key={a}
+                            size="small"
+                            type={orderAnimalFilter === a ? 'primary' : 'default'}
+                            onClick={() => setOrderAnimalFilter(orderAnimalFilter === a ? null : a)}
+                          >
+                            {ANIMAL_META[a]?.emoji} {ANIMAL_META[a]?.label}
+                          </Button>
+                        );
+                      })}
+                    </Space>
+                  )}
+                </div>
+
+                {filteredParts.length === 0 ? (
+                  <Alert
+                    type="warning"
+                    showIcon
+                    message="Depoda aktif mezbaha parçası bulunamadı. Lütfen önce parçalama yapınız veya ham stok kullanınız."
+                    style={{ marginBottom: 12 }}
+                  />
+                ) : (
+                  <div style={{
+                    maxHeight: 220, overflowY: 'auto', border: '1px solid #f0f0f0',
+                    borderRadius: 8, padding: 8, background: '#fafafa',
+                  }}>
+                    {filteredParts.map(part => {
+                      const suitability = getPartSuitability(orderListing.product_name, part.part_name);
+                      const currentKg   = orderPartKgs[part.part_id] ?? 0;
+                      const isSelected  = currentKg > 0;
+                      const isUnsuitable = suitability.status === 'unsuitable' && orderListing.product_name === 'Pastırma';
+
+                      return (
+                        <div
+                          key={part.part_id}
+                          style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '8px 12px', background: isSelected ? '#f6ffed' : '#fff',
+                            borderRadius: 6, marginBottom: 6,
+                            border: `1.5px solid ${isSelected ? '#b7eb8f' : '#e8e8e8'}`,
+                            opacity: isUnsuitable ? 0.65 : 1,
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <Checkbox
+                              disabled={isUnsuitable}
+                              checked={isSelected}
+                              onChange={e => {
+                                setOrderPartKgs(prev => ({
+                                  ...prev,
+                                  [part.part_id]: e.target.checked ? Math.min(10, Number(part.available_kg)) : 0,
+                                }));
+                              }}
+                            />
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <Text strong style={{ fontSize: 13 }}>
+                                  {ANIMAL_META[part.animal_type.toLowerCase()]?.emoji ?? '🥩'} {part.animal_type} - {part.part_name}
+                                </Text>
+                                <Tag style={{ fontSize: 10 }}>{part.lot_number}</Tag>
+                                <Tooltip title={suitability.description}>
+                                  <Tag color={suitability.tagColor} style={{ fontSize: 10, cursor: 'pointer' }}>
+                                    {suitability.badge}
+                                  </Tag>
+                                </Tooltip>
+                              </div>
+                              <Text type="secondary" style={{ fontSize: 11 }}>
+                                Depoda: <strong style={{ color: '#1890ff' }}>{Number(part.available_kg).toFixed(2)} kg</strong>
+                              </Text>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <InputNumber
+                              size="small"
+                              min={0}
+                              max={Number(part.available_kg)}
+                              step={0.5}
+                              precision={2}
+                              disabled={isUnsuitable}
+                              placeholder="0.00"
+                              value={currentKg > 0 ? currentKg : null}
+                              onChange={val => {
+                                setOrderPartKgs(prev => ({
+                                  ...prev,
+                                  [part.part_id]: val ?? 0,
+                                }));
+                              }}
+                              addonAfter="kg"
+                              style={{ width: 140 }}
+                            />
+                            <Button
+                              size="small"
+                              disabled={isUnsuitable}
+                              onClick={() => {
+                                setOrderPartKgs(prev => ({
+                                  ...prev,
+                                  [part.part_id]: Number(part.available_kg),
+                                }));
+                              }}
+                            >
+                              Tümü
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Seçilen toplam et özeti */}
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '8px 12px', background: '#e6f4ff', borderRadius: 6, marginTop: 8,
+                }}>
+                  <Text strong style={{ color: '#0958d9' }}>Seçilen Toplam Et Miktarı:</Text>
+                  <Tag color="blue" style={{ fontSize: 14, fontWeight: 700, padding: '2px 10px' }}>
+                    {orderSelectedMeatKg.toFixed(2)} kg
+                  </Tag>
+                </div>
+              </div>
+
+              {/* ── BÖLÜM 2: DİĞER REÇETE HAMMADDELERİ ── */}
+              {stockMatKeys.length > 0 && (
+                <div style={{ marginBottom: 18 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <div>
+                      <Text strong style={{ fontSize: 14 }}>2. Diğer Reçete Hammaddeleri</Text>
+                      <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
+                        Baharat, tuz, sarımsak ve kılıf stoğunuzdan gönderilecek miktarları belirleyin.
+                      </Text>
+                    </div>
+                    {orderSelectedMeatKg > 0 && (
+                      <Button
+                        size="small"
+                        type="dashed"
+                        icon={<ThunderboltOutlined />}
+                        style={{ color: '#1890ff', borderColor: '#1890ff' }}
+                        onClick={autoFillStockInputs}
+                      >
+                        Reçeteye Göre Otomatik Doldur
+                      </Button>
+                    )}
+                  </div>
+
+                  <Row gutter={[10, 10]}>
+                    {stockMatKeys.map(key => {
+                      const need  = mats[key].amount;
+                      const avail = getUnifiedAvail(key, 'stock');
+                      const val   = orderStockInputs[key] ?? 0;
+                      const isOk  = val <= avail;
+
+                      return (
+                        <Col key={key} xs={24} sm={12}>
+                          <div style={{
+                            padding: '8px 12px', background: '#fafafa', borderRadius: 8,
+                            border: `1px solid ${val > 0 && !isOk ? '#ffbb96' : '#f0f0f0'}`,
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                              <Text strong style={{ fontSize: 12 }}>{key}</Text>
+                              <Text type="secondary" style={{ fontSize: 11 }}>
+                                Reçete: {need} {mats[key].unit}/birim
+                              </Text>
+                            </div>
+                            <InputNumber
+                              size="small"
+                              min={0}
+                              step={0.1}
+                              precision={2}
+                              placeholder="0.00"
+                              value={val > 0 ? val : null}
+                              onChange={v => setOrderStockInputs(prev => ({ ...prev, [key]: v ?? 0 }))}
+                              addonAfter={mats[key].unit}
+                              style={{ width: '100%' }}
+                            />
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                              <Text style={{ fontSize: 10, color: val > 0 && !isOk ? '#ff4d4f' : '#888' }}>
+                                Depoda: {avail.toFixed(2)} {mats[key].unit}
+                              </Text>
+                              {val > 0 && (
+                                isOk
+                                  ? <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 12 }} />
+                                  : <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: 12 }} />
+                              )}
+                            </div>
+                          </div>
+                        </Col>
+                      );
+                    })}
+                  </Row>
+                </div>
+              )}
+
+              {/* ── BÖLÜM 3: ÜRETİM VE FİRE TAHMİNİ ÖZETİ ── */}
+              {orderSelectedMeatKg > 0 && (
+                <div style={{
+                  padding: '12px 16px', background: '#f6ffed', borderRadius: 8,
+                  border: '1px solid #b7eb8f', marginBottom: 16,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text type="secondary">Tahmini Mamul Çıktısı (Paket):</Text>
+                    <Text strong style={{ color: '#52c41a', fontSize: 16 }}>
+                      {expectedPackages} Paket <span style={{ fontSize: 12, fontWeight: 'normal', color: '#888' }}>(Standart 1 kg/paket)</span>
+                    </Text>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>Tahmini Kuruma & Dolum Firesi:</Text>
+                    <Tag color="volcano" style={{ fontSize: 12 }}>
+                      {estimatedFire.toFixed(2)} kg (%{totalInputKg > 0 ? ((estimatedFire / totalInputKg) * 100).toFixed(1) : 0})
+                    </Tag>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, paddingTop: 6, borderTop: '1px dashed #d9d9d9' }}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>Tahmini Fason Hizmet Tutarı:</Text>
+                    <Text strong style={{ color: '#f50', fontSize: 15 }}>
+                      {estimatedCost} €
+                    </Text>
+                  </div>
+                </div>
+              )}
+
+              {/* Sipariş Notu */}
+              <div style={{ marginBottom: 14 }}>
+                <Text style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Sipariş Notu (Opsiyonel):</Text>
+                <Input.TextArea
+                  rows={2}
+                  placeholder="Üreticiye iletmek istediğiniz özel not veya istekler..."
+                  value={orderNote}
+                  onChange={e => setOrderNote(e.target.value)}
+                />
+              </div>
+
+              <Button
+                type="primary"
+                block
+                size="large"
+                icon={<ShoppingCartOutlined />}
+                loading={orderSubmitting}
+                disabled={orderSelectedMeatKg <= 0}
+                onClick={submitOrder}
+                style={{ borderRadius: 8 }}
+              >
+                {orderSelectedMeatKg > 0
+                  ? `Siparişi Onayla ve Gönder (${orderSelectedMeatKg.toFixed(1)} kg Et · ~${expectedPackages} Paket)`
+                  : 'Lütfen En Az Bir Et Parçası Seçiniz'}
+              </Button>
+            </div>
+          );
+        })()}
+      </Modal>
+
+      {/* ── ML TAHMİN MODALI ── */}
+      <Modal
+        open={mlOpen}
+        onCancel={() => { setMlOpen(false); setMlResult(null); }}
+        footer={null}
+        width={560}
+        centered
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <RobotOutlined style={{ color: '#722ed1', fontSize: 20 }} />
@@ -1095,102 +1206,129 @@ export default function ProducerListingsPage() {
         }
       >
         {mlListing && (() => {
-          const mats    = parseMaterials(mlListing.required_materials);
-          const keys    = Object.keys(mats);
-          const matDefs = PRODUCT_MATERIALS[mlListing.product_name] ?? [];
-          const total   = Object.values(mlInputs).reduce((s, v) => s + (v || 0), 0);
+          const mats  = parseMaterials(mlListing.required_materials);
+          const keys  = Object.keys(mats);
+          const total = Object.values(mlInputs).reduce((s, v) => s + (v || 0), 0);
+
           return (
             <div>
-              <Alert type="info" showIcon icon={<ExperimentOutlined />} style={{ marginBottom: 16, fontSize: 12 }}
-                message="Hammadde miktarlarını kontrol edin — bu üreticinin geçmiş verisiyle tahmin yapılır." />
+              <Alert
+                type="info"
+                showIcon
+                icon={<ExperimentOutlined />}
+                style={{ marginBottom: 16, fontSize: 12 }}
+                message="Makine öğrenimi modeli, geçmiş fason üretim verilerine dayanarak mamul paket sayısı, kuruma firesi ve EKP tahmini yapar."
+              />
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-                {keys.map(key => {
-                  const def   = matDefs.find(m => m.name === key);
-                  const avail = def ? getUnifiedAvail(key, def.source) : 0;
-                  const entr  = mlInputs[key] ?? 0;
-                  return (
-                    <div key={key} style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '8px 12px', background: '#fafafa', borderRadius: 8,
-                      border: `1px solid ${entr > 0 && entr > avail ? '#ffbb96' : '#f0f0f0'}`,
-                    }}>
-                      <div style={{ minWidth: 140 }}>
-                        <Text>{key}</Text>
-                        {entr > 0 && !stockLoading && (
-                          <div style={{ fontSize: 11, color: entr <= avail ? '#52c41a' : '#ff4d4f' }}>
-                            Depoda: {avail.toFixed(2)} {mats[key].unit}
-                          </div>
-                        )}
+              <div style={{ marginBottom: 16 }}>
+                <Text strong style={{ fontSize: 13, display: 'block', marginBottom: 8 }}>
+                  Hammadde Miktarlarını Ayarlayın:
+                </Text>
+                <Row gutter={[8, 8]}>
+                  {keys.map(k => (
+                    <Col key={k} span={12}>
+                      <div style={{ padding: '6px 10px', background: '#fafafa', borderRadius: 6, border: '1px solid #f0f0f0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                          <Text style={{ fontSize: 12 }}>{k}</Text>
+                          <Text type="secondary" style={{ fontSize: 10 }}>Reçete: {mats[k].amount} {mats[k].unit}</Text>
+                        </div>
+                        <InputNumber
+                          size="small"
+                          min={0}
+                          step={0.5}
+                          precision={2}
+                          value={mlInputs[k] ?? null}
+                          onChange={v => setMlInputs(prev => ({ ...prev, [k]: v ?? 0 }))}
+                          addonAfter={mats[k].unit}
+                          style={{ width: '100%' }}
+                        />
                       </div>
-                      <InputNumber min={0} step={0.1} precision={2}
-                        value={mlInputs[key] ?? null}
-                        onChange={v => setMlInputs(prev => ({ ...prev, [key]: v ?? 0 }))}
-                        addonAfter={mats[key].unit} style={{ width: 160 }} />
-                    </div>
-                  );
-                })}
+                    </Col>
+                  ))}
+                </Row>
               </div>
 
-              {total > 0 && (
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between',
-                  padding: '8px 14px', background: '#f0f5ff', borderRadius: 8,
-                  border: '1px solid #adc6ff', marginBottom: 16,
-                }}>
-                  <Text type="secondary">Toplam hammadde</Text>
-                  <Text strong>{total.toFixed(2)} kg</Text>
-                </div>
-              )}
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '8px 12px', background: '#f5f5f5', borderRadius: 8, marginBottom: 16,
+              }}>
+                <Text style={{ fontSize: 13 }}>Toplam Girdi:</Text>
+                <Text strong style={{ fontSize: 14 }}>{total.toFixed(2)} kg</Text>
+              </div>
 
-              <Button type="primary" block size="large" icon={<ThunderboltOutlined />}
-                loading={mlLoading} disabled={total <= 0} onClick={runMlPredict}
-                style={{ borderRadius: 8, marginBottom: 16, background: '#722ed1', borderColor: '#722ed1' }}>
-                Tahmin Yap
+              <Button
+                type="primary"
+                block
+                size="large"
+                icon={<ThunderboltOutlined />}
+                loading={mlLoading}
+                disabled={total <= 0}
+                onClick={runMlPredict}
+                style={{ background: '#722ed1', borderColor: '#722ed1', borderRadius: 8, marginBottom: 16 }}
+              >
+                Yapay Zeka ile Tahmin Et
               </Button>
 
+              {/* Tahmin Sonuçları */}
               {mlResult && (
-                <div style={{ border: '1.5px solid #d9f7be', borderRadius: 10, padding: '16px 18px', background: '#f6ffed' }}>
+                <div style={{ padding: 16, background: '#faf5ff', borderRadius: 10, border: '1px solid #d3adf7' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <Text strong style={{ fontSize: 14 }}>Tahmin Sonucu</Text>
-                    <div style={{ display: 'flex', gap: 6 }}>
+                    <Space size={4}>
                       <Tag color="purple">{methodLabel(mlResult.method)}</Tag>
                       {mlResult.sample_count > 0 && <Tag color="blue">{mlResult.sample_count} kayıt</Tag>}
-                    </div>
+                    </Space>
                   </div>
+
                   <Row gutter={12} style={{ marginBottom: 12 }}>
                     <Col span={12}>
                       <div style={{ textAlign: 'center', padding: '12px 8px', background: '#fff', borderRadius: 8, border: '1px solid #e8e8e8' }}>
-                        <div style={{ fontSize: 26, fontWeight: 700, color: '#52c41a' }}>
-                          {(total * mlResult.predicted_qty_ratio).toFixed(1)} kg
+                        <div style={{ fontSize: 24, fontWeight: 700, color: '#52c41a' }}>
+                          {mlResult.predicted_packages ?? Math.max(1, Math.round(total * mlResult.predicted_qty_ratio))} Paket
                         </div>
-                        <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Beklenen mamul çıktı</div>
-                        <Tag style={{ marginTop: 4 }} color="green">Verim %{(mlResult.predicted_qty_ratio * 100).toFixed(1)}</Tag>
+                        <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
+                          Standart Çıktı ({mlResult.predicted_packages ?? Math.max(1, Math.round(total * mlResult.predicted_qty_ratio))} kg)
+                        </div>
                       </div>
                     </Col>
                     <Col span={12}>
                       <div style={{ textAlign: 'center', padding: '12px 8px', background: '#fff', borderRadius: 8, border: '1px solid #e8e8e8' }}>
-                        <div style={{ fontSize: 26, fontWeight: 700, color: '#f50' }}>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: '#f50' }}>
                           {mlResult.predicted_ekp.toFixed(2)} €
                         </div>
-                        <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Tahmini EKP / kg</div>
-                        <Tag style={{ marginTop: 4 }} color="orange">
-                          Toplam: {(total * mlResult.predicted_qty_ratio * mlResult.predicted_ekp).toFixed(2)} €
-                        </Tag>
+                        <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Tahmini EKP / paket</div>
                       </div>
                     </Col>
                   </Row>
-                  <div style={{ marginBottom: 10 }}>
+
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '8px 12px', background: '#fff', borderRadius: 8,
+                    border: '1px solid #e8e8e8', marginBottom: 10, fontSize: 12,
+                  }}>
+                    <Text type="secondary">Tahmini Kuruma/Dolum Firesi:</Text>
+                    <Tag color="volcano">
+                      {mlResult.predicted_fire_kg !== undefined
+                        ? `${Number(mlResult.predicted_fire_kg).toFixed(2)} kg (%${mlResult.predicted_fire_rate})`
+                        : `${Math.max(0, total - (mlResult.predicted_packages ?? Math.round(total * 0.85))).toFixed(2)} kg`}
+                    </Tag>
+                  </div>
+
+                  <div style={{ marginBottom: 8 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <Text style={{ fontSize: 12 }}>Model Güveni</Text>
+                      <Text style={{ fontSize: 12 }}>Model Güven Skoru</Text>
                       <Text style={{ fontSize: 12, color: confidenceColor(mlResult.confidence) }}>
                         %{(mlResult.confidence * 100).toFixed(0)}
                       </Text>
                     </div>
-                    <Progress percent={Math.round(mlResult.confidence * 100)}
-                      strokeColor={confidenceColor(mlResult.confidence)} showInfo={false} size="small" />
+                    <Progress
+                      percent={Math.round(mlResult.confidence * 100)}
+                      strokeColor={confidenceColor(mlResult.confidence)}
+                      showInfo={false}
+                      size="small"
+                    />
                   </div>
-                  <Alert type="warning" message={mlResult.notes} style={{ fontSize: 11, marginTop: 4 }} />
+                  {mlResult.notes && <Alert type="warning" message={mlResult.notes} style={{ fontSize: 11, marginTop: 4 }} />}
                 </div>
               )}
             </div>

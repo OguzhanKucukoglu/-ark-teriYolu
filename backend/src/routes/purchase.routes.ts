@@ -12,9 +12,9 @@ router.post('/', authorize('market'), async (req: AuthRequest, res) => {
 
   const t = await sequelize.transaction();
   try {
-    const lots = await selectQuery<{ id: number; status: string; quantity: number }>(
+    const lots = await selectQuery<{ id: number; status: string; quantity: number; lot_number: string }>(
       sequelize,
-      "SELECT id, status, quantity FROM lots WHERE id = ? AND status = 'active'",
+      "SELECT id, status, quantity, lot_number FROM lots WHERE id = ? AND status = 'active'",
       [lot_id],
       t
     );
@@ -70,11 +70,51 @@ router.post('/', authorize('market'), async (req: AuthRequest, res) => {
       t
     );
 
+    // Satış Faturası oluştur (Hayvancı -> Market)
+    const invCount = await selectQuery<{ cnt: number }>(
+      sequelize, "SELECT COUNT(*) as cnt FROM invoices WHERE invoice_type = 'satis'", [], t
+    );
+    const invSeq = (invCount[0]?.cnt || 0) + 1;
+    const invoiceNumber = `FTR-SAT-${new Date().getFullYear()}-${String(invSeq).padStart(3, '0')}`;
+    const lotNumber = lots[0]?.lot_number || 'LOT';
+
+    const listings = await selectQuery<{ title: string }>(
+      sequelize, 'SELECT title FROM farmer_listings WHERE id = ?', [listing_id], t
+    );
+    const productName = listings[0]?.title || 'Narin Sucuk 1kg';
+
+    await insertQuery(
+      sequelize,
+      `INSERT INTO invoices 
+       (invoice_number, invoice_type, sender_id, receiver_id, reference_type, reference_id, lot_number, product_name, description, quantity, unit, unit_price, subtotal, tax_rate, tax_amount, total_amount, currency, status, invoice_date)
+       VALUES (?, 'satis', ?, ?, 'market_purchase', ?, ?, ?, 'Toptan mamul sucuk satışı faturası.', ?, ?, ?, ?, 0.00, 0.00, ?, '€', 'odendi', NOW())`,
+      [invoiceNumber, farmer_id, req.user!.id, purchaseId, lotNumber, productName, quantity, unit, unit_price, totalPrice, totalPrice],
+      t
+    );
+
     await t.commit();
     res.status(201).json({ message: 'Satın alma kaydedildi', purchaseId });
   } catch {
     await t.rollback();
     res.status(500).json({ error: 'Satın alma kaydedilemedi' });
+  }
+});
+
+router.get('/complaints', authorize('hayvanci'), async (req: AuthRequest, res) => {
+  try {
+    const complaints = await selectQuery(
+      sequelize,
+      `SELECT n.id, n.title, n.message, n.reference_id as lot_id, n.is_read, n.created_at,
+              l.lot_number, l.status as lot_status, l.quantity as lot_quantity, l.unit as lot_unit
+       FROM notifications n
+       JOIN lots l ON n.reference_id = l.id
+       WHERE n.user_id = ? AND n.type = 'kalite_sorunu'
+       ORDER BY n.created_at DESC`,
+      [req.user!.id]
+    );
+    res.json(complaints);
+  } catch {
+    res.status(500).json({ error: 'Sorun bildirimleri alınamadı' });
   }
 });
 
@@ -85,8 +125,11 @@ router.get('/', async (req: AuthRequest, res) => {
 
     const purchases = await selectQuery(
       sequelize,
-      `SELECT mp.*, mu.name as market_name, fu.name as farmer_name, fu.phone as farmer_phone,
-              l.lot_number, l.status as lot_status, fl.product_name
+      `SELECT mp.*, mu.name as market_name, mu.phone as market_phone, mu.address as market_address,
+              fu.name as farmer_name, fu.phone as farmer_phone,
+              l.lot_number, l.status as lot_status, fl.product_name,
+              (SELECT COUNT(*) FROM notifications n WHERE n.reference_type = 'lot' AND n.reference_id = mp.lot_id AND n.type = 'kalite_sorunu') as complaint_count,
+              (SELECT n.message FROM notifications n WHERE n.reference_type = 'lot' AND n.reference_id = mp.lot_id AND n.type = 'kalite_sorunu' ORDER BY n.id DESC LIMIT 1) as latest_complaint
        FROM market_purchases mp
        JOIN users mu ON mp.market_id = mu.id
        JOIN users fu ON mp.farmer_id = fu.id

@@ -94,9 +94,10 @@ export const listingService = {
 
 // Purchases
 export const purchaseService = {
-  getAll:    ()             => api.get('/purchases'),
-  create:    (data: object) => api.post('/purchases', data),
-  feedback:  (lot_number: string, issue: string, extra?: object) =>
+  getAll:        ()             => api.get('/purchases'),
+  getComplaints: ()             => api.get('/purchases/complaints'),
+  create:        (data: object) => api.post('/purchases', data),
+  feedback:      (lot_number: string, issue: string, extra?: object) =>
     api.post('/purchases/feedback', { lot_number, issue_description: issue, ...extra }),
 };
 
@@ -117,6 +118,37 @@ export const recallService = {
 
 // ML
 export const mlService = {
-  predictProduction: (data: object) => api.post('/ml/predict/production', data),
-  predictButchery:   (data: object) => api.post('/ml/predict/butchery', data),
+  predictProduction:  (data: object) => api.post('/ml/predict/production', data),
+  predictButchery:    (data: object) => api.post('/ml/predict/butchery', data),
+  evaluateProduction: ()            => api.get('/ml/evaluate/production'),
+  evaluateButchery:   (animal_type?: string) => api.get('/ml/evaluate/butchery', { params: { animal_type } }),
+};
+
+// Reports
+export const reportService = {
+  getSummary:      () => api.get('/reports/summary'),
+  getPurchases:    () => api.get('/reports/purchases'),
+  getButchery:     () => api.get('/reports/butchery'),
+  getProduction:   () => api.get('/reports/production'),
+  getLotMovements: () => api.get('/reports/lot-movements'),
+  getSales:        () => api.get('/reports/sales'),
+  getRecalls:      () => api.get('/reports/recalls'),
+};
+
+// Invoices
+export const invoiceService = {
+  getAll:  (params?: { type?: string; reference_type?: string; reference_id?: number; order_id?: number }) =>
+    api.get('/invoices', { params }),
+  getById: (id: number) => api.get(`/invoices/${id}`),
+};
+
+// Anomalies (5. Görev — Anomali Uyarıları)
+export const anomalyService = {
+  getAll: () => api.get('/anomalies'),
+};
+
+// OCR (5. Görev — Fatura / İrsaliye Okuma)
+export const ocrService = {
+  analyze: (payload: { sampleId?: string; rawText?: string; fileName?: string; imageBase64?: string }) =>
+    api.post('/ocr/analyze', payload),
 };

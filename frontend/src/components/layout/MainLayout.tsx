@@ -5,7 +5,7 @@ import {
   DashboardOutlined, ScissorOutlined, ShoppingCartOutlined,
   UnorderedListOutlined, TagsOutlined, ForkOutlined, BellOutlined,
   LogoutOutlined, UserOutlined, WarningOutlined, AuditOutlined, InboxOutlined,
-  CheckCircleOutlined,
+  CheckCircleOutlined, DollarCircleOutlined, BarChartOutlined, FileTextOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useAuthStore } from '../../store/authStore';
@@ -256,9 +256,10 @@ function getMenuItems(role: string) {
   const hayvanci = [
     { key: '/butchery',          icon: <ScissorOutlined />,       label: 'Parçalama' },
     { key: '/raw-materials',     icon: <InboxOutlined />,         label: 'Hammadde Stoğu' },
-    { key: '/producer-listings', icon: <UnorderedListOutlined />, label: 'Sucukçu İlanları' },
+    { key: '/producer-listings', icon: <UnorderedListOutlined />, label: 'Üretici İlanları' },
     { key: '/orders',            icon: <ShoppingCartOutlined />,  label: 'Siparişlerim' },
     { key: '/farmer-listings',   icon: <TagsOutlined />,          label: 'İlanlarım' },
+    { key: '/sales',             icon: <DollarCircleOutlined />,  label: 'Satışlarım' },
     { key: '/lots',              icon: <AuditOutlined />,         label: 'Lot Yönetimi' },
     { key: '/recalls',           icon: <WarningOutlined />,       label: 'Geri Çağırmalar' },
   ];
@@ -275,5 +276,9 @@ function getMenuItems(role: string) {
   ];
 
   const roleMenus: Record<string, typeof dashboard> = { hayvanci, sucukcu, market };
-  return [...dashboard, ...(roleMenus[role] || [])];
+  const common = [
+    { key: '/invoices', icon: <FileTextOutlined />, label: 'Faturalar' },
+    { key: '/reports',  icon: <BarChartOutlined />, label: 'Raporlar ve Analiz' },
+  ];
+  return [...dashboard, ...(roleMenus[role] || []), ...common];
 }

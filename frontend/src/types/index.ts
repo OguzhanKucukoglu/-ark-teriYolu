@@ -76,6 +76,10 @@ export interface ProductionOrder {
   product_name: string;
   expected_qty: number;
   actual_qty?: number;
+  package_weight?: number;
+  total_input_kg?: number;
+  fire_qty?: number;
+  fire_rate?: number;
   service_cost?: number;
   total_raw_cost?: number;
   ekp?: number;
@@ -117,5 +121,35 @@ export interface Recall {
   reason: string;
   status: 'aktif' | 'tamamlandi' | 'iptal';
   affected_count?: number;
+  created_at: string;
+}
+
+export interface Invoice {
+  id: number;
+  invoice_number: string;
+  invoice_type: 'hizmet' | 'satis';
+  sender_id: number;
+  sender_name: string;
+  sender_email: string;
+  sender_role: string;
+  receiver_id: number;
+  receiver_name: string;
+  receiver_email: string;
+  receiver_role: string;
+  reference_type: string;
+  reference_id: number;
+  lot_number?: string;
+  product_name: string;
+  description?: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  subtotal: number;
+  tax_rate: number;
+  tax_amount: number;
+  total_amount: number;
+  currency: string;
+  status: 'odendi' | 'beklemede' | 'iptal';
+  invoice_date: string;
   created_at: string;
 }

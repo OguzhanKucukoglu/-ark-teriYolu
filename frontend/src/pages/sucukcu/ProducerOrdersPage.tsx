@@ -1,4 +1,5 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Table, Button, Modal, Typography, Tag, Descriptions,
   Divider, Space, Popconfirm, Alert, App,
@@ -46,6 +47,7 @@ const STATUS_MAP: Record<string, { color: string; label: string }> = {
 
 export default function ProducerOrdersPage() {
   const { message } = App.useApp();
+  const navigate = useNavigate();
   const [orders, setOrders]     = useState<Order[]>([]);
   const [loading, setLoading]   = useState(true);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -80,7 +82,10 @@ export default function ProducerOrdersPage() {
     try {
       await orderService.updateStatus(id, status);
       if (status === 'onaylandi') {
-        message.success('Sipariş onaylandı — hammaddeler hayvancının stoğundan düşüldü');
+        message.success('Sipariş onaylandı ve doğrudan Üretim Yönetimine aktarıldı!');
+        if (detailOpen) setDetailOpen(false);
+        navigate('/production');
+        return;
       } else if (status === 'iptal') {
         message.success('Sipariş iptal edildi');
       }
@@ -95,7 +100,7 @@ export default function ProducerOrdersPage() {
 
   const columns = [
     {
-      title: 'Hayvancı', dataIndex: 'buyer_name', key: 'buyer_name',
+      title: 'İşletme', dataIndex: 'buyer_name', key: 'buyer_name',
       render: (v: string) => <Text strong>{v}</Text>,
     },
     {
@@ -103,7 +108,7 @@ export default function ProducerOrdersPage() {
     },
     {
       title: 'Beklenen Miktar', dataIndex: 'expected_qty', key: 'expected_qty',
-      render: (v: number) => `${Number(v).toFixed(1)} kg`,
+      render: (v: number) => <Tag color="blue">{Math.round(Number(v))} Paket</Tag>,
     },
     {
       title: 'Durum', dataIndex: 'status', key: 'status',
@@ -126,10 +131,10 @@ export default function ProducerOrdersPage() {
           {r.status === 'beklemede' && (
             <>
               <Popconfirm
-                title="Siparişi onaylamak istiyor musunuz?"
-                description="Onaylandığında hammaddeler hayvancının stoğundan düşülecektir."
+                title="Siparişi onaylayıp üretime almak istiyor musunuz?"
+                description="Onaylandığında hammaddeler düşülecek ve üretim emri otomatik başlatılacaktır."
                 onConfirm={() => updateStatus(r.id, 'onaylandi')}
-                okText="Evet, Onayla" cancelText="Hayır"
+                okText="Evet, Onayla ve Üretime Al" cancelText="Hayır"
                 okType="primary"
               >
                 <Button
@@ -185,10 +190,10 @@ export default function ProducerOrdersPage() {
                 <Button danger icon={<CloseOutlined />}>Reddet</Button>
               </Popconfirm>
               <Popconfirm
-                title="Siparişi onaylamak istiyor musunuz?"
-                description="Onaylandığında hammaddeler hayvancının stoğundan düşülecektir."
+                title="Siparişi onaylayıp üretime almak istiyor musunuz?"
+                description="Onaylandığında hammaddeler düşülecek ve üretim emri otomatik başlatılacaktır."
                 onConfirm={() => updateStatus(detail.order.id, 'onaylandi')}
-                okText="Evet, Onayla" cancelText="Hayır" okType="primary"
+                okText="Evet, Onayla ve Üretime Al" cancelText="Hayır" okType="primary"
               >
                 <Button type="primary" icon={<CheckOutlined />}
                   loading={updating === detail?.order.id}>
@@ -214,12 +219,13 @@ export default function ProducerOrdersPage() {
         {detail && (
           <div>
             <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
-              <Descriptions.Item label="Hayvancı" span={2}>
+              <Descriptions.Item label="İşletme" span={2}>
                 <Text strong>{detail.order.buyer_name}</Text>
               </Descriptions.Item>
               <Descriptions.Item label="Ürün">{detail.order.product_name}</Descriptions.Item>
               <Descriptions.Item label="Beklenen Miktar">
-                {Number(detail.order.expected_qty).toFixed(1)} kg
+                <Text strong style={{ color: '#52c41a' }}>{Math.round(Number(detail.order.expected_qty))} Paket</Text>
+                <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>(Standart 1 kg/paket)</Text>
               </Descriptions.Item>
               <Descriptions.Item label="Sipariş Tarihi" span={2}>
                 {dayjs(detail.order.order_date).format('DD.MM.YYYY HH:mm')}
@@ -255,7 +261,7 @@ export default function ProducerOrdersPage() {
             {detail.order.status === 'beklemede' && (
               <Alert
                 type="warning" showIcon style={{ marginTop: 16, fontSize: 12 }}
-                message="Onayladığınızda hammaddeler hayvancının stoğundan otomatik düşülecektir."
+                message="Onayladığınızda hammaddeler işletmenin stoğundan otomatik düşülecektir."
               />
             )}
           </div>

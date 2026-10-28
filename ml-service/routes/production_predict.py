@@ -1,5 +1,5 @@
 """
-Model A: Üretim Verimi ve EKP Tahmini
+Model A: Üretim Verimi, Paket Sayısı (1 kg/paket) ve Fire Tahmini
 - Yeterli geçmiş veri (≥5 tamamlanmış üretim) varsa: RandomForest
 - Az veri varsa: kural tabanlı referans model
 Backend, geçmiş veriyi 'history' alanında gönderir.
@@ -13,12 +13,13 @@ import numpy as np
 router = APIRouter()
 
 MIN_SAMPLES_FOR_ML = 5  # ML modeli için minimum kayıt sayısı
+PACKAGE_WEIGHT = 1.00   # Standart paket ağırlığı (1.00 kg/paket)
 
 
 class ProductionPredictRequest(BaseModel):
     product_name: str
     producer_id: Optional[int] = None
-    service_price_per_unit: float          # €/kg
+    service_price_per_unit: float          # €/paket veya €/kg
     # Hammadde miktarları (kg) — anahtar: malzeme adı, değer: miktar
     materials: Optional[Dict[str, float]] = None
     # Backend'in eklediği geçmiş veri
@@ -26,10 +27,15 @@ class ProductionPredictRequest(BaseModel):
 
 
 class ProductionPredictResponse(BaseModel):
-    predicted_qty_ratio: float   # verim oranı (0-1)
-    predicted_ekp: float         # €/kg
+    predicted_packages: int      # Tahmini üretilecek tam paket sayısı (1 kg/paket)
+    package_weight: float        # 1.00 kg/paket standartı
+    total_input_kg: float        # Toplam hammadde girdisi (kg)
+    predicted_fire_kg: float     # Tahmini dolum ve kuruma firesi (kg)
+    predicted_fire_rate: float   # Tahmini fire oranı (%)
+    predicted_qty_ratio: float   # Verim oranı (0-1)
+    predicted_ekp: float         # Paket başına tahmini EKP (€/paket)
     confidence: float            # 0-1
-    sample_count: int            # kaç kayıtla eğitildi
+    sample_count: int            # Kaç kayıtla eğitildi
     method: str                  # "random_forest" | "linear" | "rule_based"
     notes: str
 
@@ -42,21 +48,30 @@ def _total_input_kg(materials: Optional[Dict[str, float]]) -> float:
 
 
 def _rule_based(total_input_kg: float, service_price: float) -> dict:
-    """Kural tabanlı referans: ortalama %85 verim."""
+    """Kural tabanlı referans: ortalama %85 verim (%15 fire)."""
     YIELD = 0.85
     AVG_RAW_COST_PER_KG = 12.50  # €/kg genel ortalama
-    predicted_qty = total_input_kg * YIELD
+
+    theoretical_kg = total_input_kg * YIELD
+    predicted_packages = max(1, int(round(theoretical_kg / PACKAGE_WEIGHT))) if total_input_kg >= 0.8 else 0
+    net_packaged_kg = predicted_packages * PACKAGE_WEIGHT
+    fire_kg = max(0.0, round(total_input_kg - net_packaged_kg, 3))
+    fire_rate = round((fire_kg / total_input_kg) * 100, 2) if total_input_kg > 0 else 0.0
+
     raw_cost = total_input_kg * AVG_RAW_COST_PER_KG
-    service_cost = predicted_qty * service_price
-    ekp = (raw_cost + service_cost) / predicted_qty if predicted_qty > 0 else 0
+    service_cost = predicted_packages * service_price
+    ekp = (raw_cost + service_cost) / predicted_packages if predicted_packages > 0 else 0.0
+
     return {
+        "packages": predicted_packages,
         "ratio": YIELD,
-        "ekp":   round(ekp, 4),
-        "qty":   round(predicted_qty, 3),
+        "fire_kg": fire_kg,
+        "fire_rate": fire_rate,
+        "ekp": round(ekp, 4),
     }
 
 
-def _ml_predict(history: List[Dict[str, Any]], total_input_kg: float, service_price: float) -> dict:
+def _ml_predict(history: List[Dict[str, Any]], total_input_kg: float, service_price: float) -> Optional[dict]:
     """
     Geçmiş veride actual_qty / expected_qty oranını ve EKP'yi öğren.
     Yeterli veri varsa RandomForest, değilse LinearRegression kullanır.
@@ -107,7 +122,7 @@ def _ml_predict(history: List[Dict[str, Any]], total_input_kg: float, service_pr
         model_ratio.fit(X_scaled, y_ratio)
         model_ekp.fit(X_scaled, y_ekp)
 
-        # Tahmin için girdi: beklenen çıktı ≈ input * 0.85 (ilk tahmin)
+        # Tahmin için girdi
         est_qty    = total_input_kg * 0.85
         est_svc    = est_qty * service_price
         est_raw    = total_input_kg * 12.50
@@ -116,18 +131,28 @@ def _ml_predict(history: List[Dict[str, Any]], total_input_kg: float, service_pr
         pred_ratio = float(model_ratio.predict(x_new)[0])
         pred_ekp   = float(model_ekp.predict(x_new)[0])
 
+        pred_ratio = max(0.1, min(1.5, pred_ratio))
+        theoretical_kg = total_input_kg * pred_ratio
+        predicted_packages = max(1, int(round(theoretical_kg / PACKAGE_WEIGHT))) if total_input_kg >= 0.8 else 0
+        net_packaged_kg = predicted_packages * PACKAGE_WEIGHT
+        fire_kg = max(0.0, round(total_input_kg - net_packaged_kg, 3))
+        fire_rate = round((fire_kg / total_input_kg) * 100, 2) if total_input_kg > 0 else 0.0
+
         # Güven: tahmin sapmasının std'ye oranı
         residuals  = np.abs(y_ratio - model_ratio.predict(X_scaled))
         confidence = max(0.0, min(1.0, 1.0 - float(np.mean(residuals))))
 
         return {
-            "ratio":      round(max(0.1, min(1.5, pred_ratio)), 4),
+            "packages":   predicted_packages,
+            "ratio":      round(pred_ratio, 4),
+            "fire_kg":    fire_kg,
+            "fire_rate":  fire_rate,
             "ekp":        round(max(0, pred_ekp), 4),
             "confidence": round(confidence, 3),
             "method":     method,
             "n":          n,
         }
-    except Exception as e:
+    except Exception:
         return None
 
 
@@ -141,6 +166,11 @@ def predict_production(req: ProductionPredictRequest):
 
     if ml:
         return ProductionPredictResponse(
+            predicted_packages=ml["packages"],
+            package_weight=PACKAGE_WEIGHT,
+            total_input_kg=round(total_input, 3),
+            predicted_fire_kg=ml["fire_kg"],
+            predicted_fire_rate=ml["fire_rate"],
             predicted_qty_ratio=ml["ratio"],
             predicted_ekp=ml["ekp"],
             confidence=ml["confidence"],
@@ -148,8 +178,7 @@ def predict_production(req: ProductionPredictRequest):
             method=ml["method"],
             notes=(
                 f"{ml['n']} tamamlanmış üretim kaydına dayalı {ml['method'].replace('_', ' ')} modeli. "
-                f"Tahmini verim oranı: %{ml['ratio']*100:.1f}. "
-                "Daha fazla üretim tamamlandıkça tahmin iyileşir."
+                f"Tahmini çıktı: {ml['packages']} Paket (1 kg) | Tahmini Fire: {ml['fire_kg']} kg (%{ml['fire_rate']})."
             ),
         )
 
@@ -157,14 +186,18 @@ def predict_production(req: ProductionPredictRequest):
     rule = _rule_based(total_input, req.service_price_per_unit)
     n = len(history)
     return ProductionPredictResponse(
+        predicted_packages=rule["packages"],
+        package_weight=PACKAGE_WEIGHT,
+        total_input_kg=round(total_input, 3),
+        predicted_fire_kg=rule["fire_kg"],
+        predicted_fire_rate=rule["fire_rate"],
         predicted_qty_ratio=rule["ratio"],
         predicted_ekp=rule["ekp"],
         confidence=0.5,
         sample_count=n,
         method="rule_based",
         notes=(
-            f"Henüz yeterli tamamlanmış üretim kaydı yok ({n} kayıt, minimum {MIN_SAMPLES_FOR_ML} gerekli). "
-            "Genel sektör ortalaması kullanılıyor (%85 verim). "
-            "Daha fazla üretim tamamlandıkça kişisel model devreye girer."
+            f"Henüz yeterli üretici kaydı yok ({n} kayıt, minimum {MIN_SAMPLES_FOR_ML} gerekli). "
+            f"Sektör ortalaması baz alındı: {rule['packages']} Paket (1 kg) | Tahmini Fire: {rule['fire_kg']} kg (%{rule['fire_rate']})."
         ),
     )

@@ -1,11 +1,13 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Table, Button, Modal, Typography, Tag, Descriptions,
-  Divider, App, Empty,
+  Divider, App, Empty, Space,
 } from 'antd';
-import { EyeOutlined, ShoppingOutlined } from '@ant-design/icons';
+import { EyeOutlined, ShoppingOutlined, FileTextOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { orderService } from '../../services/api';
+import { orderService, invoiceService } from '../../services/api';
+import { Invoice } from '../../types';
+import { InvoiceModal } from '../../components/InvoiceModal';
 
 const { Title, Text } = Typography;
 
@@ -49,6 +51,22 @@ export default function OrdersPage() {
   const [loading, setLoading]       = useState(true);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detail, setDetail]         = useState<{ order: Order; rawMaterials: RawMaterial[] } | null>(null);
+  const [invoiceModalVisible, setInvoiceModalVisible] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+
+  async function openInvoice(orderId: number) {
+    try {
+      const { data } = await invoiceService.getAll({ order_id: orderId });
+      if (data && data.length > 0) {
+        setSelectedInvoice(data[0]);
+        setInvoiceModalVisible(true);
+      } else {
+        message.warning('Bu siparişe ait fatura bulunamadı');
+      }
+    } catch {
+      message.error('Fatura yüklenemedi');
+    }
+  }
 
   async function load() {
     try {
@@ -75,7 +93,7 @@ export default function OrdersPage() {
 
   const columns = [
     {
-      title: 'Sucukçu', dataIndex: 'seller_name', key: 'seller_name',
+      title: 'Üretici', dataIndex: 'seller_name', key: 'seller_name',
       render: (v: string) => <Text strong>{v}</Text>,
     },
     {
@@ -83,7 +101,7 @@ export default function OrdersPage() {
     },
     {
       title: 'Beklenen Miktar', dataIndex: 'expected_qty', key: 'expected_qty',
-      render: (v: number) => `${Number(v).toFixed(1)} kg`,
+      render: (v: number) => `${Math.round(Number(v))} Paket (1 kg/paket)`,
     },
     {
       title: 'Durum', dataIndex: 'status', key: 'status',
@@ -97,11 +115,22 @@ export default function OrdersPage() {
       render: (v: string) => dayjs(v).format('DD.MM.YYYY HH:mm'),
     },
     {
-      title: '', key: 'action',
+      title: 'İşlemler', key: 'action',
       render: (_: unknown, r: Order) => (
-        <Button size="small" icon={<EyeOutlined />} onClick={() => viewDetail(r.id)}>
-          Detay
-        </Button>
+        <Space size="small">
+          <Button size="small" icon={<EyeOutlined />} onClick={() => viewDetail(r.id)}>
+            Detay
+          </Button>
+          {r.status === 'tamamlandi' && (
+            <Button
+              size="small"
+              icon={<FileTextOutlined />}
+              onClick={() => openInvoice(r.id)}
+            >
+              Fatura
+            </Button>
+          )}
+        </Space>
       ),
     },
   ];
@@ -150,7 +179,7 @@ export default function OrdersPage() {
       >
         {detail && (
           <div>
-            {/* Sucukçu bilgileri */}
+            {/* Üretici bilgileri */}
             <div style={{
               background: '#f0f5ff', borderRadius: 10, padding: '12px 16px',
               marginBottom: 16, border: '1px solid #adc6ff',
@@ -178,7 +207,8 @@ export default function OrdersPage() {
             <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
               <Descriptions.Item label="Ürün">{detail.order.product_name}</Descriptions.Item>
               <Descriptions.Item label="Beklenen Miktar">
-                {Number(detail.order.expected_qty).toFixed(1)} kg
+                <Text strong style={{ color: '#52c41a' }}>{Math.round(Number(detail.order.expected_qty))} Paket</Text>
+                <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>(Standart 1 kg/paket)</Text>
               </Descriptions.Item>
               <Descriptions.Item label="Sipariş Tarihi" span={2}>
                 {dayjs(detail.order.order_date).format('DD.MM.YYYY HH:mm')}
@@ -218,7 +248,7 @@ export default function OrdersPage() {
                 background: '#fffbe6', borderRadius: 8, border: '1px solid #ffe58f',
               }}>
                 <Text style={{ fontSize: 12 }}>
-                  ⏳ Sucukçunun onayı bekleniyor. Onaylandığında hammaddeler stoğunuzdan düşülecektir.
+                  ⏳ Üreticinin onayı bekleniyor. Onaylandığında hammaddeler stoğunuzdan düşülecektir.
                 </Text>
               </div>
             )}
@@ -235,6 +265,12 @@ export default function OrdersPage() {
           </div>
         )}
       </Modal>
+
+      <InvoiceModal
+        visible={invoiceModalVisible}
+        invoice={selectedInvoice}
+        onClose={() => setInvoiceModalVisible(false)}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Table, Button, Modal, Typography, Tag, Descriptions,
   Divider, Space, InputNumber, DatePicker, Alert, App,
@@ -6,24 +6,17 @@ import {
 } from 'antd';
 import {
   CheckCircleFilled, EyeOutlined,
-  PlusOutlined, ExperimentOutlined,
+  ReloadOutlined, ExperimentOutlined, FileTextOutlined,
+  WarningOutlined,
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
-import { productionService, orderService } from '../../services/api';
+import { productionService, invoiceService } from '../../services/api';
+import { Invoice } from '../../types';
+import { InvoiceModal } from '../../components/InvoiceModal';
 
 const { Title, Text } = Typography;
 
 // ── Tipler ───────────────────────────────────────────────────────────────────
-interface Order {
-  id: number;
-  buyer_name: string;
-  product_name: string;
-  expected_qty: number;
-  status: string;
-  order_date: string;
-  notes?: string;
-}
-
 interface ProductionOrder {
   id: number;
   order_id: number;
@@ -32,6 +25,10 @@ interface ProductionOrder {
   product_name: string;
   expected_qty: number;
   actual_qty?: number;
+  package_weight?: number;
+  total_input_kg?: number;
+  fire_qty?: number;
+  fire_rate?: number;
   service_cost?: number;
   total_raw_cost?: number;
   ekp?: number;
@@ -60,6 +57,10 @@ interface FinishedLot {
 interface CompletionResult {
   lotNumber: string;
   actualQty: number;
+  packageWeight?: number;
+  totalInputKg?: number;
+  fireQty?: number;
+  fireRate?: number;
   totalRawCost: number;
   serviceCost: number;
   totalCost: number;
@@ -83,13 +84,6 @@ export default function ProductionPage() {
   const [productions, setProductions] = useState<ProductionOrder[]>([]);
   const [loading, setLoading]         = useState(true);
 
-  // Yeni üretim emri — onaylı siparişler
-  const [newOpen, setNewOpen]         = useState(false);
-  const [readyOrders, setReadyOrders] = useState<Order[]>([]);
-  const [ordersLoading, setOrdersLoading] = useState(false);
-  const [creating, setCreating]       = useState(false);
-  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
-
   // Detay
   const [detailOpen, setDetailOpen]   = useState(false);
   const [detail, setDetail]           = useState<{
@@ -106,6 +100,23 @@ export default function ProductionPage() {
   const [productionDate, setProductionDate] = useState<Dayjs>(dayjs());
   const [submitting, setSubmitting]     = useState(false);
   const [result, setResult]             = useState<CompletionResult | null>(null);
+  const [orderInputKg, setOrderInputKg] = useState<number>(0);
+  const [invoiceModalVisible, setInvoiceModalVisible] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+
+  async function openInvoice(prodId: number) {
+    try {
+      const { data } = await invoiceService.getAll({ reference_type: 'production_order', reference_id: prodId });
+      if (data && data.length > 0) {
+        setSelectedInvoice(data[0]);
+        setInvoiceModalVisible(true);
+      } else {
+        message.warning('Bu üretim emrine ait fatura bulunamadı');
+      }
+    } catch {
+      message.error('Fatura yüklenemedi');
+    }
+  }
 
   // ── Yükleme ─────────────────────────────────────────────────────────────
   async function loadProductions() {
@@ -121,54 +132,6 @@ export default function ProductionPage() {
 
   useEffect(() => { loadProductions(); }, []);
 
-  // Onaylanan siparişleri yükle (üretim emri açılabilecekler)
-  async function loadReadyOrders() {
-    setOrdersLoading(true);
-    try {
-      const { data } = await orderService.getAll();
-      // Onaylı veya hammadde gönderilmiş, henüz üretim emri olmayan siparişler
-      const existingOrderIds = new Set(productions.map(p => p.order_id));
-      setReadyOrders(
-        (data as Order[]).filter(o =>
-          (o.status === 'onaylandi' || o.status === 'hammadde_gonderildi') &&
-          !existingOrderIds.has(o.id)
-        )
-      );
-    } catch {
-      message.error('Siparişler yüklenemedi');
-    } finally {
-      setOrdersLoading(false);
-    }
-  }
-
-  function openNew() {
-    setSelectedOrderId(null);
-    setNewOpen(true);
-    loadReadyOrders();
-  }
-
-  async function createProduction() {
-    if (!selectedOrderId) return;
-    const order = readyOrders.find(o => o.id === selectedOrderId);
-    if (!order) return;
-
-    setCreating(true);
-    try {
-      await productionService.create({
-        order_id:     selectedOrderId,
-        product_name: order.product_name,
-        expected_qty: order.expected_qty,
-      });
-      message.success('Üretim emri oluşturuldu');
-      setNewOpen(false);
-      loadProductions();
-    } catch {
-      message.error('Üretim emri oluşturulamadı');
-    } finally {
-      setCreating(false);
-    }
-  }
-
   // Detay
   async function viewDetail(id: number) {
     try {
@@ -181,13 +144,25 @@ export default function ProductionPage() {
   }
 
   // Tamamlama
-  function openComplete(prod: ProductionOrder) {
+  async function openComplete(prod: ProductionOrder) {
     setCompleting(prod);
-    setActualQty(Number(prod.expected_qty));
+    const initialQty = Math.round(Number(prod.expected_qty)) || 1;
+    setActualQty(initialQty);
     setServiceCost(null);
     setProductionDate(dayjs());
     setResult(null);
+    setOrderInputKg(0);
     setCompleteOpen(true);
+
+    try {
+      const { data } = await productionService.getById(prod.id);
+      if (data && data.rawMaterials) {
+        const total = data.rawMaterials.reduce((sum: number, rm: { quantity_used: number }) => sum + Number(rm.quantity_used || 0), 0);
+        setOrderInputKg(total);
+      }
+    } catch {
+      // sessizce geç
+    }
   }
 
   async function submitComplete() {
@@ -215,7 +190,7 @@ export default function ProductionPage() {
       render: (v: string) => <Tag color="blue">{v}</Tag>,
     },
     {
-      title: 'Hayvancı', dataIndex: 'buyer_name', key: 'buyer_name',
+      title: 'İşletme', dataIndex: 'buyer_name', key: 'buyer_name',
       render: (v: string) => <Text strong>{v}</Text>,
     },
     {
@@ -223,15 +198,34 @@ export default function ProductionPage() {
     },
     {
       title: 'Beklenen', dataIndex: 'expected_qty', key: 'expected_qty',
-      render: (v: number) => `${Number(v).toFixed(1)} kg`,
+      render: (v: number) => `${Math.round(Number(v))} Paket`,
     },
     {
-      title: 'Gerçek', dataIndex: 'actual_qty', key: 'actual_qty',
-      render: (v: number) => v ? <Text strong style={{ color: '#52c41a' }}>{Number(v).toFixed(1)} kg</Text> : '—',
+      title: 'Gerçekleşen', dataIndex: 'actual_qty', key: 'actual_qty',
+      render: (v: number) => v ? <Text strong style={{ color: '#52c41a' }}>{Math.round(Number(v))} Paket</Text> : '—',
+    },
+    {
+      title: 'Fire / Kayıp', key: 'fire',
+      render: (_: unknown, r: ProductionOrder) => {
+        if (r.status !== 'tamamlandi' && r.status !== 'sevk_edildi') return '—';
+        const rate = Number(r.fire_rate || 0);
+        return (
+          <Space size={4}>
+            <Tag color={rate > 20 ? 'volcano' : 'blue'}>
+              {Number(r.fire_qty || 0).toFixed(2)} kg (%{rate.toFixed(1)})
+            </Tag>
+            {rate > 20 && (
+              <Tag color="red" icon={<WarningOutlined />} style={{ fontWeight: 600 }}>
+                Anomali
+              </Tag>
+            )}
+          </Space>
+        );
+      },
     },
     {
       title: 'EKP', dataIndex: 'ekp', key: 'ekp',
-      render: (v: number) => v ? <Tag color="orange">{Number(v).toFixed(4)} €/kg</Tag> : '—',
+      render: (v: number) => v ? <Tag color="orange">{Number(v).toFixed(4)} €/paket</Tag> : '—',
     },
     {
       title: 'Durum', dataIndex: 'status', key: 'status',
@@ -247,6 +241,15 @@ export default function ProductionPage() {
           <Button size="small" icon={<EyeOutlined />} onClick={() => viewDetail(r.id)}>
             Detay
           </Button>
+          {(r.status === 'tamamlandi' || r.status === 'sevk_edildi') && (
+            <Button
+              size="small"
+              icon={<FileTextOutlined />}
+              onClick={() => openInvoice(r.id)}
+            >
+              Fatura
+            </Button>
+          )}
           {r.status === 'uretimde' && (
             <Button
               size="small" type="primary" icon={<CheckCircleFilled />}
@@ -270,11 +273,16 @@ export default function ProductionPage() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Title level={3} style={{ margin: 0 }}>
-          <ExperimentOutlined /> Üretim Yönetimi
-        </Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openNew}>
-          Yeni Üretim Emri
+        <div>
+          <Title level={3} style={{ margin: 0 }}>
+            <ExperimentOutlined /> Üretim Yönetimi
+          </Title>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            Gelen siparişler onaylandığında doğrudan buraya aktarılır ve üretime başlanır.
+          </Text>
+        </div>
+        <Button icon={<ReloadOutlined />} onClick={loadProductions}>
+          Yenile
         </Button>
       </div>
 
@@ -294,7 +302,7 @@ export default function ProductionPage() {
         </Col>
         <Col span={8}>
           <Card size="small">
-            <Statistic title="Ort. EKP" value={biten > 0 ? toplamEkp.toFixed(4) : '—'} suffix="€/kg"
+            <Statistic title="Ort. EKP" value={biten > 0 ? toplamEkp.toFixed(4) : '—'} suffix="€/paket"
               valueStyle={{ color: '#fa8c16' }} />
           </Card>
         </Col>
@@ -304,79 +312,6 @@ export default function ProductionPage() {
         dataSource={productions} columns={columns} rowKey="id"
         loading={loading} pagination={{ pageSize: 15 }}
       />
-
-      {/* ── Yeni Üretim Emri Modalı ── */}
-      <Modal
-        open={newOpen}
-        onCancel={() => setNewOpen(false)}
-        title={<><PlusOutlined /> Yeni Üretim Emri</>}
-        footer={
-          <Space>
-            <Button onClick={() => setNewOpen(false)}>İptal</Button>
-            <Button type="primary" loading={creating}
-              disabled={!selectedOrderId} onClick={createProduction}>
-              Üretim Emri Oluştur
-            </Button>
-          </Space>
-        }
-        width={540}
-      >
-        {ordersLoading ? (
-          <div style={{ textAlign: 'center', padding: 32 }}>
-            <Text type="secondary">Onaylı siparişler yükleniyor...</Text>
-          </div>
-        ) : readyOrders.length === 0 ? (
-          <Alert
-            type="info" showIcon
-            message="Üretim emri açılabilecek onaylı sipariş bulunmuyor."
-            description="Hayvancının siparişi onaylamanız gerekiyor (Gelen Siparişler sayfasından)."
-          />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <Text type="secondary" style={{ fontSize: 12, marginBottom: 4 }}>
-              Üretim emri açmak istediğiniz siparişi seçin:
-            </Text>
-            {readyOrders.map(order => {
-              const sel = selectedOrderId === order.id;
-              return (
-                <div
-                  key={order.id}
-                  onClick={() => setSelectedOrderId(order.id)}
-                  style={{
-                    padding: '12px 16px', borderRadius: 10, cursor: 'pointer',
-                    border: `1.5px solid ${sel ? '#1890ff' : '#f0f0f0'}`,
-                    background: sel ? '#e6f4ff' : '#fafafa',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <Text strong>{order.product_name}</Text>
-                      <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
-                        — {order.buyer_name}
-                      </Text>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <Tag color="green">{Number(order.expected_qty).toFixed(1)} kg</Tag>
-                      <Tag color={order.status === 'onaylandi' ? 'green' : 'blue'}>
-                        {order.status === 'onaylandi' ? 'Onaylı' : 'Hammadde Gönderildi'}
-                      </Tag>
-                    </div>
-                  </div>
-                  {order.notes && (
-                    <Text type="secondary" style={{ fontSize: 11, marginTop: 4, display: 'block' }}>
-                      Not: {order.notes}
-                    </Text>
-                  )}
-                  <Text type="secondary" style={{ fontSize: 11 }}>
-                    {dayjs(order.order_date).format('DD.MM.YYYY')}
-                  </Text>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Modal>
 
       {/* ── Detay Modalı ── */}
       <Modal
@@ -406,23 +341,27 @@ export default function ProductionPage() {
         {detail && (
           <div>
             <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
-              <Descriptions.Item label="Hayvancı" span={2}>
+              <Descriptions.Item label="İşletme" span={2}>
                 <Text strong>{detail.productionOrder.buyer_name}</Text>
               </Descriptions.Item>
               <Descriptions.Item label="Ürün">{detail.productionOrder.product_name}</Descriptions.Item>
               <Descriptions.Item label="Beklenen Miktar">
-                {Number(detail.productionOrder.expected_qty).toFixed(1)} kg
+                <Text strong>{Math.round(Number(detail.productionOrder.expected_qty))} Paket</Text>
+                <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>(Standart 1 kg/paket)</Text>
               </Descriptions.Item>
               {detail.productionOrder.actual_qty && (
                 <Descriptions.Item label="Gerçek Miktar">
                   <Text strong style={{ color: '#52c41a' }}>
-                    {Number(detail.productionOrder.actual_qty).toFixed(1)} kg
+                    {Math.round(Number(detail.productionOrder.actual_qty))} Paket
+                  </Text>
+                  <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>
+                    (Standart 1 kg/paket)
                   </Text>
                 </Descriptions.Item>
               )}
               {detail.productionOrder.ekp && (
                 <Descriptions.Item label="EKP">
-                  <Tag color="orange">{Number(detail.productionOrder.ekp).toFixed(4)} €/kg</Tag>
+                  <Tag color="orange">{Number(detail.productionOrder.ekp).toFixed(4)} €/paket</Tag>
                 </Descriptions.Item>
               )}
               {detail.productionOrder.service_cost && (
@@ -513,24 +452,24 @@ export default function ProductionPage() {
             }}>
               <Row gutter={[16, 12]}>
                 <Col span={12}>
-                  <Statistic title="Gerçek Üretim" value={result.actualQty.toFixed(1)} suffix="kg"
+                  <Statistic title="Gerçekleşen Üretim" value={result.actualQty} suffix="Paket (1 kg)"
                     valueStyle={{ color: '#52c41a', fontSize: 20 }} />
                 </Col>
                 <Col span={12}>
-                  <Statistic title="EKP (Birim Maliyet)" value={result.ekp.toFixed(4)} suffix="€/kg"
+                  <Statistic title="Oluşan Fire / Kayıp" value={Number(result.fireQty || 0).toFixed(2)} suffix={`kg (%${Number(result.fireRate || 0).toFixed(1)})`}
+                    valueStyle={{ color: Number(result.fireRate || 0) > 20 ? '#d97706' : '#2563eb', fontSize: 18 }} />
+                </Col>
+                <Col span={12}>
+                  <Statistic title="EKP (Paket Başı)" value={result.ekp.toFixed(4)} suffix="€/paket"
                     valueStyle={{ color: '#fa8c16', fontSize: 20 }} />
                 </Col>
                 <Col span={12}>
-                  <Statistic title="VKP (%38 Marjla)" value={result.vkp.toFixed(4)} suffix="€/kg"
+                  <Statistic title="VKP (%38 Marjla)" value={result.vkp.toFixed(4)} suffix="€/paket"
                     valueStyle={{ color: '#1890ff', fontSize: 18 }} />
                 </Col>
                 <Col span={12}>
                   <Statistic title="Brüt Kâr Marjı" value={result.marj.toFixed(2)} suffix="%"
                     valueStyle={{ color: result.marj > 20 ? '#52c41a' : '#faad14', fontSize: 18 }} />
-                </Col>
-                <Col span={12}>
-                  <Statistic title="Hammadde Maliyeti" value={result.totalRawCost.toFixed(2)} suffix="€"
-                    valueStyle={{ fontSize: 16 }} />
                 </Col>
                 <Col span={12}>
                   <Statistic title="Hizmet Bedeli" value={result.serviceCost.toFixed(2)} suffix="€"
@@ -544,7 +483,7 @@ export default function ProductionPage() {
               border: '1px solid #adc6ff', marginBottom: 16,
             }}>
               <Text style={{ fontSize: 12 }}>
-                📦 Lot <strong>{result.lotNumber}</strong> oluşturuldu ve hayvancının stoğuna eklendi.
+                📦 Lot <strong>{result.lotNumber}</strong> ({result.actualQty} Paket) oluşturuldu ve işletmenin stoğuna aktarıldı.
               </Text>
             </div>
 
@@ -562,33 +501,63 @@ export default function ProductionPage() {
               <Text type="secondary" style={{ fontSize: 12 }}>Sipariş:</Text>
               <Text strong style={{ marginLeft: 8 }}>{completing?.product_name}</Text>
               <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
-                — {completing?.buyer_name} · Beklenen: {Number(completing?.expected_qty).toFixed(1)} kg
+                — {completing?.buyer_name} · Beklenen: {Math.round(Number(completing?.expected_qty))} Paket (1 kg/paket)
               </Text>
+            </div>
+
+            {/* Fire ve Gramaj Bilgi Kartı */}
+            <div style={{
+              background: '#f8fafc', borderRadius: 8, padding: '12px 14px',
+              border: '1px solid #e2e8f0', marginBottom: 14,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
+                <Text type="secondary">Toplam Hammadde Girdisi:</Text>
+                <Text strong>{orderInputKg > 0 ? `${orderInputKg.toFixed(2)} kg` : 'Hesaplanıyor...'}</Text>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
+                <Text type="secondary">Net Ambalajlanan Mamul:</Text>
+                <Text strong style={{ color: '#2563eb' }}>
+                  {Number(actualQty || 0) * 1.0} kg ({actualQty || 0} Paket)
+                </Text>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                <Text type="secondary">Oluşan Fire / Dolum Kaybı:</Text>
+                <Tag color={orderInputKg > 0 && ((Math.max(0, orderInputKg - (Number(actualQty || 0) * 1.0)) / orderInputKg) * 100) > 20 ? 'volcano' : 'green'}>
+                  {orderInputKg > 0 ? Math.max(0, orderInputKg - (Number(actualQty || 0) * 1.0)).toFixed(2) : '0.00'} kg
+                  {orderInputKg > 0 ? ` (%${((Math.max(0, orderInputKg - (Number(actualQty || 0) * 1.0)) / orderInputKg) * 100).toFixed(1)})` : ''}
+                </Tag>
+              </div>
+
+              {orderInputKg > 0 && ((Math.max(0, orderInputKg - (Number(actualQty || 0) * 1.0)) / orderInputKg) * 100) > 20 && (
+                <Alert
+                  type="warning"
+                  showIcon
+                  icon={<WarningOutlined />}
+                  style={{ marginTop: 8, fontSize: 11 }}
+                  message="⚠️ Anomali Uyarısı: Yüksek Fire Oranı"
+                  description={`Girilen paket sayısı %${((Math.max(0, orderInputKg - (Number(actualQty || 0) * 1.0)) / orderInputKg) * 100).toFixed(1)} oranında fire oluşturmaktadır (Standart tavan eşik: %20.0). Lütfen tartımı teyit ediniz.`}
+                />
+              )}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <Text style={{ fontSize: 13, display: 'block', marginBottom: 6 }}>
-                  Gerçek Üretilen Miktar (kg)
+                  Gerçek Üretilen Tam Paket Adedi (1 kg / Paket)
                 </Text>
                 <InputNumber
-                  min={0.001} step={0.1} precision={3}
+                  min={1} step={1} precision={0}
                   value={actualQty}
-                  onChange={v => setActualQty(v)}
-                  addonAfter="kg"
+                  onChange={v => setActualQty(v ? Math.round(v) : null)}
+                  addonAfter="Paket"
                   style={{ width: '100%' }}
                   size="large"
                 />
-                {actualQty && completing && (
-                  <Text type="secondary" style={{ fontSize: 11 }}>
-                    Verim: %{((actualQty / Number(completing.expected_qty)) * 100).toFixed(1)}
-                  </Text>
-                )}
               </div>
 
               <div>
                 <Text style={{ fontSize: 13, display: 'block', marginBottom: 6 }}>
-                  Hizmet Bedeli (toplam işçilik/üretim ücreti)
+                  Hizmet Bedeli (toplam fason işçilik faturası tutarı)
                 </Text>
                 <InputNumber
                   min={0} step={0.01} precision={2}
@@ -598,6 +567,11 @@ export default function ProductionPage() {
                   style={{ width: '100%' }}
                   size="large"
                 />
+                {serviceCost && actualQty && actualQty > 0 && (
+                  <Text type="secondary" style={{ fontSize: 11, marginTop: 4, display: 'block' }}>
+                    Paket Başına Hizmet: {(serviceCost / actualQty).toFixed(2)} €/paket
+                  </Text>
+                )}
               </div>
 
               <div>
@@ -620,16 +594,17 @@ export default function ProductionPage() {
                   border: '1px solid #ffe58f',
                 }}>
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    Tahmini EKP (hammadde maliyeti bilinmeden): Hizmet / Miktar ={' '}
-                    <strong>{(serviceCost / actualQty).toFixed(4)} €/kg</strong>
-                    {' '}(gerçek EKP hammadde maliyeti eklenerek hesaplanır)
+                    Tahmini EKP (hammadde maliyeti hariç): Hizmet / Paket ={' '}
+                    <strong>{(serviceCost / actualQty).toFixed(4)} €/paket</strong>
+                    <br />
+                    (Tüm hammadde maliyeti + fason hizmet bedeli çıkan {actualQty} tam pakete bölünerek net EKP belirlenir)
                   </Text>
                 </div>
               )}
 
               <Alert
                 type="info" showIcon style={{ fontSize: 12 }}
-                message="Tamamlandığında EKP hesaplanır, mamul lotu hayvancının stoğuna eklenir."
+                message="Tamamlandığında fire kaydedilir, paket başına EKP hesaplanır ve mamul lotu işletmenin stoğuna aktarılır."
               />
 
               <Button
@@ -645,6 +620,12 @@ export default function ProductionPage() {
           </div>
         )}
       </Modal>
+
+      <InvoiceModal
+        visible={invoiceModalVisible}
+        invoice={selectedInvoice}
+        onClose={() => setInvoiceModalVisible(false)}
+      />
     </div>
   );
 }

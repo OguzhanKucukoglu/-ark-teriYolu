@@ -17,6 +17,10 @@ import purchaseRoutes   from './routes/purchase.routes';
 import recallRoutes     from './routes/recall.routes';
 import mlRoutes         from './routes/ml.routes';
 import notificationRoutes from './routes/notification.routes';
+import reportRoutes       from './routes/report.routes';
+import invoiceRoutes      from './routes/invoice.routes';
+import anomalyRoutes      from './routes/anomaly.routes';
+import ocrRoutes          from './routes/ocr.routes';
 
 dotenv.config();
 
@@ -41,6 +45,10 @@ app.use('/api/purchases',  purchaseRoutes);
 app.use('/api/recalls',    recallRoutes);
 app.use('/api/ml',         mlRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/reports',       reportRoutes);
+app.use('/api/invoices',      invoiceRoutes);
+app.use('/api/anomalies',     anomalyRoutes);
+app.use('/api/ocr',           ocrRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -63,6 +71,40 @@ async function bootstrap() {
   try {
     await sequelize.authenticate();
     logger.info('MySQL bağlantısı başarılı.');
+
+    // Görev 2 Parçalama Maliyet Dağıtım Anahtarı Şema Senkronizasyonu (Idempotent)
+    const butcheryOpsCols = [
+      { col: 'input_weight_kg', type: 'DECIMAL(10,3) NOT NULL DEFAULT 0.000' },
+      { col: 'animal_ear_tag', type: 'VARCHAR(50) NULL' },
+      { col: 'unit_cost_input', type: 'DECIMAL(12,4) NOT NULL DEFAULT 0.0000' },
+      { col: 'distribution_method', type: "VARCHAR(30) NOT NULL DEFAULT 'agirlik'" },
+    ];
+    for (const c of butcheryOpsCols) {
+      try {
+        await sequelize.query(`ALTER TABLE butchery_operations ADD COLUMN ${c.col} ${c.type}`);
+      } catch {
+        // Kolon zaten varsa yoksayılır
+      }
+    }
+
+    const butcheryPartsCols = [
+      { col: 'allocated_cost', type: 'DECIMAL(12,4) NOT NULL DEFAULT 0.0000' },
+      { col: 'unit_cost', type: 'DECIMAL(12,4) NOT NULL DEFAULT 0.0000' },
+    ];
+    for (const c of butcheryPartsCols) {
+      try {
+        await sequelize.query(`ALTER TABLE butchery_parts ADD COLUMN ${c.col} ${c.type}`);
+      } catch {
+        // Kolon zaten varsa yoksayılır
+      }
+    }
+
+    try {
+      await sequelize.query('ALTER TABLE order_raw_materials MODIFY COLUMN lot_id INT UNSIGNED NULL');
+    } catch {
+      // Yoksay
+    }
+
     app.listen(PORT, () => {
       logger.info(`AVATAR Backend çalışıyor: http://localhost:${PORT}`);
     });

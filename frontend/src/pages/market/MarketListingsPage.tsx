@@ -84,7 +84,7 @@ export default function MarketListingsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <Title level={3} style={{ margin: 0 }}>🛒 Ürün İlanları</Title>
         <Search
-          placeholder="Ürün veya hayvancı ara..."
+          placeholder="Ürün veya işletme ara..."
           allowClear style={{ width: 280 }}
           prefix={<SearchOutlined />}
           value={search}

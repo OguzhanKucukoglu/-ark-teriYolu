@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import {
   Table, Tag, Typography, Button, Modal, Form, Input,
-  Card, Row, Col, Statistic, Empty, App, Alert,
+  Card, Row, Col, Statistic, Empty, App, Alert, Space,
 } from 'antd';
 import {
-  ShoppingCartOutlined, WarningOutlined, PhoneOutlined,
+  ShoppingCartOutlined, WarningOutlined, PhoneOutlined, FileTextOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { purchaseService } from '../../services/api';
+import { purchaseService, invoiceService } from '../../services/api';
+import { Invoice } from '../../types';
+import { InvoiceModal } from '../../components/InvoiceModal';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -48,7 +50,23 @@ export default function PurchasesPage() {
   const [feedbackOpen, setFeedbackOpen]       = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
   const [submitting, setSubmitting]           = useState(false);
+  const [invoiceModalVisible, setInvoiceModalVisible] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [form] = Form.useForm();
+
+  async function openInvoice(purchaseId: number) {
+    try {
+      const { data } = await invoiceService.getAll({ reference_type: 'market_purchase', reference_id: purchaseId });
+      if (data && data.length > 0) {
+        setSelectedInvoice(data[0]);
+        setInvoiceModalVisible(true);
+      } else {
+        message.warning('Bu işleme ait fatura bulunamadı');
+      }
+    } catch {
+      message.error('Fatura yüklenemedi');
+    }
+  }
 
   async function load() {
     try {
@@ -149,14 +167,23 @@ export default function PurchasesPage() {
     {
       title: 'İşlem', key: 'action',
       render: (_: unknown, r: Purchase) => (
-        <Button
-          size="small"
-          danger
-          icon={<WarningOutlined />}
-          onClick={() => openFeedback(r)}
-        >
-          Sorun Bildir
-        </Button>
+        <Space size="small">
+          <Button
+            size="small"
+            icon={<FileTextOutlined />}
+            onClick={() => openInvoice(r.id)}
+          >
+            Fatura
+          </Button>
+          <Button
+            size="small"
+            danger
+            icon={<WarningOutlined />}
+            onClick={() => openFeedback(r)}
+          >
+            Sorun Bildir
+          </Button>
+        </Space>
       ),
     },
   ];
@@ -255,6 +282,12 @@ export default function PurchasesPage() {
           </Form>
         )}
       </Modal>
+
+      <InvoiceModal
+        visible={invoiceModalVisible}
+        invoice={selectedInvoice}
+        onClose={() => setInvoiceModalVisible(false)}
+      />
     </div>
   );
 }
