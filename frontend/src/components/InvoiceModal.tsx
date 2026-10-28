@@ -8,6 +8,8 @@ import {
   ShopOutlined,
 } from '@ant-design/icons';
 import { Invoice } from '../types';
+import { useTranslation } from '../i18n';
+import { formatUnit, formatDbProduct, formatDbRole } from '../i18n/formatters';
 
 const { Title, Text } = Typography;
 
@@ -18,29 +20,30 @@ interface InvoiceModalProps {
 }
 
 export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, onClose }) => {
+  const { t } = useTranslation();
   if (!invoice) return null;
 
   const isHizmet = invoice.invoice_type === 'hizmet';
   const roleLabels: Record<string, string> = {
-    hayvanci: 'İşletme',
-    sucukcu: 'Üretici',
-    market: 'Perakendeci (Market)',
+    hayvanci: t('roles.hayvanci'),
+    sucukcu: t('roles.sucukcu'),
+    market: t('roles.market'),
   };
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=900,height=1000');
     if (!printWindow) return;
 
-    const invoiceTitle = isHizmet ? 'FASON ÜRETİM & İŞÇİLİK HİZMET FATURASI' : 'TOPTAN MAMUL SATIŞ FATURASI';
-    const senderRoleText = roleLabels[invoice.sender_role] || invoice.sender_role;
-    const receiverRoleText = roleLabels[invoice.receiver_role] || invoice.receiver_role;
+    const invoiceTitle = isHizmet ? t('invoices.serviceInvoice').toUpperCase() : t('invoices.salesInvoice').toUpperCase();
+    const senderRoleText = formatDbRole(invoice.sender_role, t);
+    const receiverRoleText = formatDbRole(invoice.receiver_role, t);
 
     printWindow.document.write(`
       <!DOCTYPE html>
-      <html lang="tr">
+      <html>
       <head>
         <meta charset="utf-8" />
-        <title>Fatura - ${invoice.invoice_number}</title>
+        <title>${t('invoices.title')} - ${invoice.invoice_number}</title>
         <style>
           @page { size: A4; margin: 15mm; }
           body {
@@ -197,31 +200,31 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
           <div class="header">
             <div class="logo-area">
               <h1>AVATAR E-FATURA</h1>
-              <p>Gıda Takip & Maliyet Muhasebesi Platformu</p>
+              <p>${t('invoices.platformSubtitle')}</p>
             </div>
             <div class="invoice-meta">
               <h2>${invoiceTitle}</h2>
-              <p><strong>Fatura No:</strong> ${invoice.invoice_number}</p>
-              <p><strong>Tarih:</strong> ${new Date(invoice.invoice_date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-              <p><span class="badge">ÖDENDİ</span></p>
+              <p><strong>${t('invoices.invoiceNumber')}:</strong> ${invoice.invoice_number}</p>
+              <p><strong>${t('common.date')}:</strong> ${new Date(invoice.invoice_date).toLocaleDateString()}</p>
+              <p><span class="badge">${t('invoices.paid')}</span></p>
             </div>
           </div>
 
           <div class="parties">
             <div class="party-card">
-              <div class="party-title">DÜZENLEYEN (HİZMET SAĞLAYICI / SATICI)</div>
+              <div class="party-title">${t('invoices.servicePartyTitle')}</div>
               <div class="party-name">${invoice.sender_name}</div>
-              <div class="party-detail"><strong>Unvan/Rol:</strong> ${senderRoleText}</div>
-              <div class="party-detail"><strong>E-Posta:</strong> ${invoice.sender_email}</div>
-              <div class="party-detail"><strong>Sistem Kullanıcı ID:</strong> #${invoice.sender_id}</div>
+              <div class="party-detail"><strong>${t('invoices.roleTag')}</strong> ${senderRoleText}</div>
+              <div class="party-detail"><strong>${t('auth.email')}:</strong> ${invoice.sender_email}</div>
+              <div class="party-detail"><strong>${t('invoices.systemUserId')}:</strong> #${invoice.sender_id}</div>
             </div>
 
             <div class="party-card">
-              <div class="party-title">SAYIN (ALICI / HİZMET ALAN)</div>
+              <div class="party-title">${t('invoices.receiverPartyTitle')}</div>
               <div class="party-name">${invoice.receiver_name}</div>
-              <div class="party-detail"><strong>Unvan/Rol:</strong> ${receiverRoleText}</div>
-              <div class="party-detail"><strong>E-Posta:</strong> ${invoice.receiver_email}</div>
-              <div class="party-detail"><strong>Sistem Kullanıcı ID:</strong> #${invoice.receiver_id}</div>
+              <div class="party-detail"><strong>${t('invoices.roleTag')}</strong> ${receiverRoleText}</div>
+              <div class="party-detail"><strong>${t('auth.email')}:</strong> ${invoice.receiver_email}</div>
+              <div class="party-detail"><strong>${t('invoices.systemUserId')}:</strong> #${invoice.receiver_id}</div>
             </div>
           </div>
 
@@ -229,25 +232,25 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
             <thead>
               <tr>
                 <th style="width: 40px;">#</th>
-                <th>Mal / Hizmet Açıklaması</th>
-                <th>İlgili Lot No</th>
-                <th class="text-right">Miktar</th>
-                <th class="text-right">Birim Fiyat</th>
-                <th class="text-right">KDV (%${Number(invoice.tax_rate).toFixed(0)})</th>
-                <th class="text-right">Toplam Tutar</th>
+                <th>${t('invoices.descriptionItem')}</th>
+                <th>${t('invoices.relatedLot')}</th>
+                <th class="text-right">${t('common.quantity')}</th>
+                <th class="text-right">${t('common.unitPrice')}</th>
+                <th class="text-right">${t('invoices.tax')} (%${Number(invoice.tax_rate).toFixed(0)})</th>
+                <th class="text-right">${t('common.totalPrice')}</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td>1</td>
                 <td>
-                  <strong>${invoice.product_name}</strong>
+                  <strong>${formatDbProduct(invoice.product_name, t)}</strong>
                   <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">
-                    ${invoice.description || (isHizmet ? 'Fason üretim & işleme işçiliği' : 'Toptan mamul satışı')}
+                    ${invoice.description || (isHizmet ? t('invoices.serviceDescriptionDefault') : t('invoices.salesDescriptionDefault'))}
                   </div>
                 </td>
                 <td><code style="background: #f3f4f6; padding: 2px 5px; border-radius: 4px;">${invoice.lot_number || '-'}</code></td>
-                <td class="text-right">${Number(invoice.quantity).toLocaleString('tr-TR')} ${invoice.unit}</td>
+                <td class="text-right">${Number(invoice.quantity).toLocaleString()} ${formatUnit(invoice.unit, t)}</td>
                 <td class="text-right">${Number(invoice.unit_price).toFixed(2)} ${invoice.currency}</td>
                 <td class="text-right">${Number(invoice.tax_amount).toFixed(2)} ${invoice.currency}</td>
                 <td class="text-right"><strong>${Number(invoice.total_amount).toFixed(2)} ${invoice.currency}</strong></td>
@@ -258,29 +261,29 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
           <div class="totals-wrap">
             <table class="totals-table">
               <tr>
-                <td>Ara Toplam:</td>
+                <td>${t('invoices.subtotal')}:</td>
                 <td class="text-right">${Number(invoice.subtotal).toFixed(2)} ${invoice.currency}</td>
               </tr>
               <tr>
-                <td>Hesaplanan KDV (%${Number(invoice.tax_rate).toFixed(0)}):</td>
+                <td>${t('invoices.calculatedTax')} (%${Number(invoice.tax_rate).toFixed(0)}):</td>
                 <td class="text-right">${Number(invoice.tax_amount).toFixed(2)} ${invoice.currency}</td>
               </tr>
               <tr class="grand-total">
-                <td>GENEL TOPLAM:</td>
+                <td>${t('invoices.totalWithTax').toUpperCase()}:</td>
                 <td class="text-right">${Number(invoice.total_amount).toFixed(2)} ${invoice.currency}</td>
               </tr>
             </table>
           </div>
 
           <div class="note-box">
-            <strong>Mali Açıklama & Not:</strong><br/>
+            <strong>${t('invoices.financialNotice')}:</strong><br/>
             ${isHizmet
-              ? 'İşbu fatura, sucuk üreticisinin işletmeye sağladığı fason işleme ve işçilik hizmet bedelidir. Reçetede kullanılan et, baharat ve kılıf hammaddeleri işletmeye aittir ve mamul EKP hesabında hammadde maliyeti olarak ayrıca muhasebeleştirilmiştir.'
-              : 'İşbu fatura, AVATAR Lot Takip Sistemi güvencesiyle üretilmiş nihai sucuk mamullerinin toptan satış bedelidir.'}
+              ? t('invoices.financialNoticeHizmet')
+              : t('invoices.financialNoticeSatis')}
           </div>
 
           <div class="footer-note">
-            Bu belge AVATAR Gıda Takip & Maliyet Muhasebesi Sistemi tarafından elektronik ortamda tanzim edilmiştir. Belge No: ${invoice.invoice_number}
+            ${t('invoices.docGeneratedNote')} ${t('invoices.invoiceNumber')}: ${invoice.invoice_number}
           </div>
         </div>
       </body>
@@ -303,45 +306,45 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
       render: () => 1,
     },
     {
-      title: 'Mal / Hizmet Açıklaması',
+      title: t('invoices.descriptionItem'),
       dataIndex: 'product_name',
       key: 'product_name',
       render: (text: string) => (
         <div>
           <Text strong>{text}</Text>
           <div style={{ fontSize: 12, color: '#6b7280' }}>
-            {invoice.description || (isHizmet ? 'Fason üretim & işçilik' : 'Toptan mamul satışı')}
+            {invoice.description || (isHizmet ? t('invoices.serviceInvoice') : t('invoices.salesInvoice'))}
           </div>
         </div>
       ),
     },
     {
-      title: 'Lot No',
+      title: t('common.lotNumber'),
       dataIndex: 'lot_number',
       key: 'lot_number',
       render: (lot: string) => (lot ? <Tag color="blue">{lot}</Tag> : '-'),
     },
     {
-      title: 'Miktar',
+      title: t('common.quantity'),
       key: 'quantity',
       align: 'right' as const,
-      render: () => `${Number(invoice.quantity).toLocaleString('tr-TR')} ${invoice.unit}`,
+      render: () => `${Number(invoice.quantity).toLocaleString()} ${invoice.unit}`,
     },
     {
-      title: 'Birim Fiyat',
+      title: t('common.unitPrice'),
       dataIndex: 'unit_price',
       key: 'unit_price',
       align: 'right' as const,
       render: (val: number) => `${Number(val).toFixed(2)} ${invoice.currency}`,
     },
     {
-      title: 'KDV',
+      title: t('invoices.tax'),
       key: 'tax_amount',
       align: 'right' as const,
       render: () => `${Number(invoice.tax_amount).toFixed(2)} ${invoice.currency}`,
     },
     {
-      title: 'Toplam Tutar',
+      title: t('common.totalPrice'),
       dataIndex: 'total_amount',
       key: 'total_amount',
       align: 'right' as const,
@@ -357,15 +360,15 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <SafetyCertificateOutlined style={{ color: '#2563eb', fontSize: 20 }} />
-          <span>Elektronik Fatura Görüntüleyici</span>
+          <span>{t('invoices.title')}</span>
           <Tag color={isHizmet ? 'purple' : 'green'}>
-            {isHizmet ? 'Fason Hizmet Faturası' : 'Satış Faturası'}
+            {isHizmet ? t('invoices.serviceInvoice') : t('invoices.salesInvoice')}
           </Tag>
         </div>
       }
       footer={[
         <Button key="close" onClick={onClose}>
-          Kapat
+          {t('common.close')}
         </Button>,
         <Button
           key="print"
@@ -374,7 +377,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
           style={{ background: '#2563eb' }}
           onClick={handlePrint}
         >
-          PDF Olarak İndir / Yazdır
+          {t('invoices.printPdf')}
         </Button>,
       ]}
     >
@@ -392,10 +395,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
         >
           <div>
             <Title level={4} style={{ margin: 0, color: '#1e3a8a' }}>
-              AVATAR E-FATURA SİSTEMİ
+              AVATAR E-INVOICE
             </Title>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {isHizmet ? 'Üretici ➔ İşletme Hizmet Faturası' : 'İşletme ➔ Market Satış Faturası'}
+              {isHizmet ? t('invoices.serviceInvoice') : t('invoices.salesInvoice')}
             </Text>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -403,10 +406,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
               {invoice.invoice_number}
             </div>
             <div style={{ fontSize: 12, color: '#6b7280' }}>
-              Tarih: {new Date(invoice.invoice_date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              {t('common.date')}: {new Date(invoice.invoice_date).toLocaleDateString()}
             </div>
             <Tag icon={<CheckCircleOutlined />} color="success" style={{ marginTop: 4 }}>
-              ÖDENDİ
+              {t('invoices.paid')}
             </Tag>
           </div>
         </div>
@@ -433,19 +436,19 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
               }}
             >
               <UserOutlined style={{ marginRight: 5 }} />
-              DÜZENLEYEN (SATICI / HİZMET SAĞLAYICI)
+              {t('invoices.sender').toUpperCase()}
             </div>
             <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
               {invoice.sender_name}
             </div>
             <div style={{ fontSize: 12, color: '#475569', marginTop: 3 }}>
-              <strong>Unvan/Rol:</strong> {roleLabels[invoice.sender_role] || invoice.sender_role}
+              <strong>{t('invoices.roleTag')}</strong> {roleLabels[invoice.sender_role] || invoice.sender_role}
             </div>
             <div style={{ fontSize: 12, color: '#475569' }}>
-              <strong>E-Posta:</strong> {invoice.sender_email}
+              <strong>E-Mail:</strong> {invoice.sender_email}
             </div>
             <div style={{ fontSize: 12, color: '#64748b' }}>
-              <strong>Kullanıcı No:</strong> #{invoice.sender_id}
+              <strong>ID:</strong> #{invoice.sender_id}
             </div>
           </div>
 
@@ -469,19 +472,19 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
               }}
             >
               <ShopOutlined style={{ marginRight: 5 }} />
-              SAYIN (ALICI / MÜŞTERİ)
+              {t('invoices.receiver').toUpperCase()}
             </div>
             <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
               {invoice.receiver_name}
             </div>
             <div style={{ fontSize: 12, color: '#475569', marginTop: 3 }}>
-              <strong>Unvan/Rol:</strong> {roleLabels[invoice.receiver_role] || invoice.receiver_role}
+              <strong>{t('invoices.roleTag')}</strong> {roleLabels[invoice.receiver_role] || invoice.receiver_role}
             </div>
             <div style={{ fontSize: 12, color: '#475569' }}>
-              <strong>E-Posta:</strong> {invoice.receiver_email}
+              <strong>E-Mail:</strong> {invoice.receiver_email}
             </div>
             <div style={{ fontSize: 12, color: '#64748b' }}>
-              <strong>Kullanıcı No:</strong> #{invoice.receiver_id}
+              <strong>ID:</strong> #{invoice.receiver_id}
             </div>
           </div>
         </div>
@@ -508,11 +511,11 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
-              <Text type="secondary">Ara Toplam:</Text>
+              <Text type="secondary">{t('invoices.subtotal')}:</Text>
               <Text strong>{Number(invoice.subtotal).toFixed(2)} {invoice.currency}</Text>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
-              <Text type="secondary">KDV (%{Number(invoice.tax_rate).toFixed(0)}):</Text>
+              <Text type="secondary">{t('invoices.tax')} (%{Number(invoice.tax_rate).toFixed(0)}):</Text>
               <Text strong>{Number(invoice.tax_amount).toFixed(2)} {invoice.currency}</Text>
             </div>
             <Divider style={{ margin: '8px 0' }} />
@@ -525,7 +528,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
                 color: '#1d4ed8',
               }}
             >
-              <span>Genel Toplam:</span>
+              <span>{t('invoices.totalWithTax')}:</span>
               <span>{Number(invoice.total_amount).toFixed(2)} {invoice.currency}</span>
             </div>
           </div>
@@ -543,10 +546,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
             color: '#92400e',
           }}
         >
-          <strong>Mali Bilgilendirme: </strong>
+          <strong>{t('invoices.financialNotice')}: </strong>
           {isHizmet
-            ? 'Bu fatura fason üretim ve işçilik hizmet bedelidir. Reçetede tüketilen tüm hammadde maliyetleri işletme bünyesinde olup mamul EKP hesabına doğrudan dahil edilmiştir.'
-            : 'Bu fatura AVATAR platformu üzerinden onaylanmış toptan mamul satışına aittir.'}
+            ? t('invoices.financialNoticeHizmet')
+            : t('invoices.financialNoticeSatis')}
         </div>
       </div>
     </Modal>

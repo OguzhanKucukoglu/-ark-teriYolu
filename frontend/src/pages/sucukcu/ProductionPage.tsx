@@ -14,6 +14,8 @@ import { productionService, invoiceService } from '../../services/api';
 import { Invoice } from '../../types';
 import { InvoiceModal } from '../../components/InvoiceModal';
 import { formatMoney, convertToEur, CurrencySelect, EurEquivalentPreview } from '../../utils/currency';
+import { useTranslation } from '../../i18n';
+import { formatUnit, formatDbStatus, formatDbPart, formatDbProduct } from '../../i18n/formatters';
 
 const { Title, Text } = Typography;
 
@@ -80,6 +82,7 @@ const STATUS_MAP: Record<string, { color: string; label: string }> = {
 
 // ── Bileşen ───────────────────────────────────────────────────────────────────
 export default function ProductionPage() {
+  const { t } = useTranslation();
   const { message } = App.useApp();
 
   const [productions, setProductions] = useState<ProductionOrder[]>([]);
@@ -189,26 +192,27 @@ export default function ProductionPage() {
   // ── Tablo ────────────────────────────────────────────────────────────────
   const columns = [
     {
-      title: 'Üretim No', dataIndex: 'production_number', key: 'production_number',
+      title: t('production.productionNo'), dataIndex: 'production_number', key: 'production_number',
       render: (v: string) => <Tag color="blue">{v}</Tag>,
     },
     {
-      title: 'İşletme', dataIndex: 'buyer_name', key: 'buyer_name',
+      title: t('roles.hayvanci'), dataIndex: 'buyer_name', key: 'buyer_name',
       render: (v: string) => <Text strong>{v}</Text>,
     },
     {
-      title: 'Ürün', dataIndex: 'product_name', key: 'product_name',
+      title: t('production.productName'), dataIndex: 'product_name', key: 'product_name',
+      render: (v: string) => <strong>{formatDbProduct(v, t)}</strong>,
     },
     {
-      title: 'Beklenen', dataIndex: 'expected_qty', key: 'expected_qty',
-      render: (v: number) => `${Math.round(Number(v))} Paket`,
+      title: t('production.expectedQty'), dataIndex: 'expected_qty', key: 'expected_qty',
+      render: (v: number) => `${Math.round(Number(v))} ${t('production.packageUnit')}`,
     },
     {
-      title: 'Gerçekleşen', dataIndex: 'actual_qty', key: 'actual_qty',
-      render: (v: number) => v ? <Text strong style={{ color: '#52c41a' }}>{Math.round(Number(v))} Paket</Text> : '—',
+      title: t('production.actualQty'), dataIndex: 'actual_qty', key: 'actual_qty',
+      render: (v: number) => v ? <Text strong style={{ color: '#52c41a' }}>{Math.round(Number(v))} {t('production.packageUnit')}</Text> : '—',
     },
     {
-      title: 'Fire / Kayıp', key: 'fire',
+      title: t('butchery.wasteLoss'), key: 'fire',
       render: (_: unknown, r: ProductionOrder) => {
         if (r.status !== 'tamamlandi' && r.status !== 'sevk_edildi') return '—';
         const rate = Number(r.fire_rate || 0);
@@ -219,7 +223,7 @@ export default function ProductionPage() {
             </Tag>
             {rate > 20 && (
               <Tag color="red" icon={<WarningOutlined />} style={{ fontWeight: 600 }}>
-                Anomali
+                {t('reports.tabAnomalies')}
               </Tag>
             )}
           </Space>
@@ -227,22 +231,22 @@ export default function ProductionPage() {
       },
     },
     {
-      title: 'EKP', dataIndex: 'ekp', key: 'ekp',
-      render: (v: number) => v ? <Tag color="orange">{Number(v).toFixed(4)} €/paket</Tag> : '—',
+      title: t('production.ekp'), dataIndex: 'ekp', key: 'ekp',
+      render: (v: number) => v ? <Tag color="orange">{Number(v).toFixed(4)} €/{t('production.packageUnit').toLowerCase()}</Tag> : '—',
     },
     {
-      title: 'Durum', dataIndex: 'status', key: 'status',
+      title: t('common.status'), dataIndex: 'status', key: 'status',
       render: (v: string) => {
-        const s = STATUS_MAP[v] ?? { color: 'default', label: v };
-        return <Tag color={s.color}>{s.label}</Tag>;
+        const s = STATUS_MAP[v] ?? { color: 'default' };
+        return <Tag color={s.color}>{formatDbStatus(v, t)}</Tag>;
       },
     },
     {
-      title: 'İşlemler', key: 'actions',
+      title: t('common.actions'), key: 'actions',
       render: (_: unknown, r: ProductionOrder) => (
         <Space>
           <Button size="small" icon={<EyeOutlined />} onClick={() => viewDetail(r.id)}>
-            Detay
+            {t('common.details')}
           </Button>
           {(r.status === 'tamamlandi' || r.status === 'sevk_edildi') && (
             <Button
@@ -250,7 +254,7 @@ export default function ProductionPage() {
               icon={<FileTextOutlined />}
               onClick={() => openInvoice(r.id)}
             >
-              Fatura
+              {t('invoices.title')}
             </Button>
           )}
           {r.status === 'uretimde' && (
@@ -258,7 +262,7 @@ export default function ProductionPage() {
               size="small" type="primary" icon={<CheckCircleFilled />}
               onClick={() => openComplete(r)}
             >
-              Tamamla
+              {t('common.confirm')}
             </Button>
           )}
         </Space>
@@ -278,14 +282,14 @@ export default function ProductionPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
           <Title level={3} style={{ margin: 0 }}>
-            <ExperimentOutlined /> Üretim Yönetimi
+            <ExperimentOutlined /> {t('production.title')}
           </Title>
           <Text type="secondary" style={{ fontSize: 13 }}>
-            Gelen siparişler onaylandığında doğrudan buraya aktarılır ve üretime başlanır.
+            {t('production.ordersFlowNotice')}
           </Text>
         </div>
         <Button icon={<ReloadOutlined />} onClick={loadProductions}>
-          Yenile
+          {t('common.refresh')}
         </Button>
       </div>
 
@@ -293,19 +297,19 @@ export default function ProductionPage() {
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={8}>
           <Card size="small">
-            <Statistic title="Aktif Üretim" value={aktif} suffix="adet"
+            <Statistic title={t('production.activeProduction')} value={aktif} suffix={`(${t('common.active')})`}
               valueStyle={{ color: aktif > 0 ? '#1890ff' : undefined }} />
           </Card>
         </Col>
         <Col span={8}>
           <Card size="small">
-            <Statistic title="Tamamlanan" value={biten} suffix="adet"
+            <Statistic title={t('production.completedCount')} value={biten} suffix={`(${t('common.completed')})`}
               valueStyle={{ color: '#52c41a' }} />
           </Card>
         </Col>
         <Col span={8}>
           <Card size="small">
-            <Statistic title="Ort. EKP" value={biten > 0 ? toplamEkp.toFixed(4) : '—'} suffix="€/paket"
+            <Statistic title={t('production.avgEkp')} value={biten > 0 ? toplamEkp.toFixed(4) : '—'} suffix={`€/${t('production.packageUnit').toLowerCase()}`}
               valueStyle={{ color: '#fa8c16' }} />
           </Card>
         </Col>
@@ -324,7 +328,7 @@ export default function ProductionPage() {
           detail?.productionOrder.status === 'uretimde' ? (
             <Button type="primary" icon={<CheckCircleFilled />}
               onClick={() => { setDetailOpen(false); openComplete(detail!.productionOrder); }}>
-              Üretimi Tamamla
+              {t('production.completeTitle')}
             </Button>
           ) : null
         }
@@ -335,7 +339,7 @@ export default function ProductionPage() {
             <span>{detail?.productionOrder.production_number}</span>
             {detail && (
               <Tag color={STATUS_MAP[detail.productionOrder.status]?.color}>
-                {STATUS_MAP[detail.productionOrder.status]?.label}
+                {detail.productionOrder.status === 'beklemede' ? t('common.pending') : detail.productionOrder.status === 'uretimde' ? t('common.inProduction') : detail.productionOrder.status === 'tamamlandi' ? t('common.completed') : STATUS_MAP[detail.productionOrder.status]?.label}
               </Tag>
             )}
           </div>
@@ -344,41 +348,41 @@ export default function ProductionPage() {
         {detail && (
           <div>
             <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
-              <Descriptions.Item label="İşletme" span={2}>
+              <Descriptions.Item label={t('production.farmLabel')} span={2}>
                 <Text strong>{detail.productionOrder.buyer_name}</Text>
               </Descriptions.Item>
-              <Descriptions.Item label="Ürün">{detail.productionOrder.product_name}</Descriptions.Item>
-              <Descriptions.Item label="Beklenen Miktar">
-                <Text strong>{Math.round(Number(detail.productionOrder.expected_qty))} Paket</Text>
-                <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>(Standart 1 kg/paket)</Text>
+              <Descriptions.Item label={t('production.productName')}>{detail.productionOrder.product_name}</Descriptions.Item>
+              <Descriptions.Item label={t('production.expectedQty')}>
+                <Text strong>{Math.round(Number(detail.productionOrder.expected_qty))} {t('production.packageUnit')}</Text>
+                <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>(1 kg / {t('production.packageUnit')})</Text>
               </Descriptions.Item>
               {detail.productionOrder.actual_qty && (
-                <Descriptions.Item label="Gerçek Miktar">
+                <Descriptions.Item label={t('production.actualQty')}>
                   <Text strong style={{ color: '#52c41a' }}>
-                    {Math.round(Number(detail.productionOrder.actual_qty))} Paket
+                    {Math.round(Number(detail.productionOrder.actual_qty))} {t('production.packageUnit')}
                   </Text>
                   <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>
-                    (Standart 1 kg/paket)
+                    (1 kg / {t('production.packageUnit')})
                   </Text>
                 </Descriptions.Item>
               )}
               {detail.productionOrder.ekp && (
-                <Descriptions.Item label="EKP">
-                  <Tag color="orange">{Number(detail.productionOrder.ekp).toFixed(4)} €/paket</Tag>
+                <Descriptions.Item label={t('production.ekp')}>
+                  <Tag color="orange">{Number(detail.productionOrder.ekp).toFixed(4)} €/{t('production.packageUnit').toLowerCase()}</Tag>
                 </Descriptions.Item>
               )}
               {detail.productionOrder.service_cost && (
-                <Descriptions.Item label="Hizmet Bedeli">
+                <Descriptions.Item label={t('production.serviceCost')}>
                   {Number(detail.productionOrder.service_cost).toFixed(2)} €
                 </Descriptions.Item>
               )}
               {detail.productionOrder.total_raw_cost && (
-                <Descriptions.Item label="Hammadde Maliyeti">
+                <Descriptions.Item label={t('production.rawCostLabel')}>
                   {Number(detail.productionOrder.total_raw_cost).toFixed(2)} €
                 </Descriptions.Item>
               )}
               {detail.productionOrder.production_date && (
-                <Descriptions.Item label="Üretim Tarihi" span={2}>
+                <Descriptions.Item label={t('production.productionDateLabel')} span={2}>
                   {dayjs(detail.productionOrder.production_date).format('DD.MM.YYYY')}
                 </Descriptions.Item>
               )}
@@ -386,7 +390,7 @@ export default function ProductionPage() {
 
             {detail.rawMaterials.length > 0 && (
               <>
-                <Divider style={{ margin: '12px 0' }}>Kullanılan Hammaddeler</Divider>
+                <Divider style={{ margin: '12px 0' }}>{t('production.usedMaterials')}</Divider>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {detail.rawMaterials.map(rm => (
                     <div key={rm.id} style={{
@@ -394,9 +398,9 @@ export default function ProductionPage() {
                       padding: '6px 12px', background: '#fafafa', borderRadius: 6,
                       border: '1px solid #f0f0f0',
                     }}>
-                      <Text>{rm.material_type}</Text>
+                      <Text>{formatDbPart(rm.material_type, t)}</Text>
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <Tag color="blue">{Number(rm.quantity_used).toFixed(2)} {rm.unit}</Tag>
+                        <Tag color="blue">{Number(rm.quantity_used).toFixed(2)} {formatUnit(rm.unit, t)}</Tag>
                         <Tag>{rm.lot_number}</Tag>
                         <Text type="secondary" style={{ fontSize: 11 }}>
                           {Number(rm.total_cost).toFixed(2)} €
@@ -410,7 +414,7 @@ export default function ProductionPage() {
 
             {detail.finishedLots.length > 0 && (
               <>
-                <Divider style={{ margin: '12px 0' }}>Oluşan Mamul Lotlar</Divider>
+                <Divider style={{ margin: '12px 0' }}>{t('production.producedLots')}</Divider>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {detail.finishedLots.map(fl => (
                     <div key={fl.id} style={{
@@ -440,14 +444,14 @@ export default function ProductionPage() {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <CheckCircleFilled style={{ color: '#52c41a' }} />
-            <span>Üretimi Tamamla — {completing?.production_number}</span>
+            <span>{t('production.completeTitle')} — {completing?.production_number}</span>
           </div>
         }
       >
         {result ? (
           // Tamamlama sonucu göster
           <div>
-            <Alert type="success" showIcon message="Üretim başarıyla tamamlandı!" style={{ marginBottom: 16 }} />
+            <Alert type="success" showIcon message={t('production.completeSuccess')} style={{ marginBottom: 16 }} />
 
             <div style={{
               background: '#f6ffed', border: '1.5px solid #b7eb8f',
@@ -455,27 +459,27 @@ export default function ProductionPage() {
             }}>
               <Row gutter={[16, 12]}>
                 <Col span={12}>
-                  <Statistic title="Gerçekleşen Üretim" value={result.actualQty} suffix="Paket (1 kg)"
+                  <Statistic title={t('production.actualResultSummary')} value={result.actualQty} suffix={`${t('production.packageUnit')} (1 kg)`}
                     valueStyle={{ color: '#52c41a', fontSize: 20 }} />
                 </Col>
                 <Col span={12}>
-                  <Statistic title="Oluşan Fire / Kayıp" value={Number(result.fireQty || 0).toFixed(2)} suffix={`kg (%${Number(result.fireRate || 0).toFixed(1)})`}
+                  <Statistic title={t('production.fireOccurred')} value={Number(result.fireQty || 0).toFixed(2)} suffix={`kg (%${Number(result.fireRate || 0).toFixed(1)})`}
                     valueStyle={{ color: Number(result.fireRate || 0) > 20 ? '#d97706' : '#2563eb', fontSize: 18 }} />
                 </Col>
                 <Col span={12}>
-                  <Statistic title="EKP (Paket Başı)" value={result.ekp.toFixed(4)} suffix="€/paket"
+                  <Statistic title={t('production.ekp')} value={result.ekp.toFixed(4)} suffix={`€/${t('production.packageUnit').toLowerCase()}`}
                     valueStyle={{ color: '#fa8c16', fontSize: 20 }} />
                 </Col>
                 <Col span={12}>
-                  <Statistic title="VKP (%38 Marjla)" value={result.vkp.toFixed(4)} suffix="€/paket"
+                  <Statistic title={t('production.vkp')} value={result.vkp.toFixed(4)} suffix={`€/${t('production.packageUnit').toLowerCase()}`}
                     valueStyle={{ color: '#1890ff', fontSize: 18 }} />
                 </Col>
                 <Col span={12}>
-                  <Statistic title="Brüt Kâr Marjı" value={result.marj.toFixed(2)} suffix="%"
+                  <Statistic title={t('production.grossMargin')} value={result.marj.toFixed(2)} suffix="%"
                     valueStyle={{ color: result.marj > 20 ? '#52c41a' : '#faad14', fontSize: 18 }} />
                 </Col>
                 <Col span={12}>
-                  <Statistic title="Hizmet Bedeli" value={result.serviceCost.toFixed(2)} suffix="€"
+                  <Statistic title={t('production.serviceCost')} value={result.serviceCost.toFixed(2)} suffix="€"
                     valueStyle={{ fontSize: 16 }} />
                 </Col>
               </Row>
@@ -486,12 +490,12 @@ export default function ProductionPage() {
               border: '1px solid #adc6ff', marginBottom: 16,
             }}>
               <Text style={{ fontSize: 12 }}>
-                📦 Lot <strong>{result.lotNumber}</strong> ({result.actualQty} Paket) oluşturuldu ve işletmenin stoğuna aktarıldı.
+                📦 Lot <strong>{result.lotNumber}</strong> ({result.actualQty} {t('production.packageUnit')}) {t('production.completeSuccess')}
               </Text>
             </div>
 
             <Button type="primary" block onClick={() => { setCompleteOpen(false); setResult(null); }}>
-              Kapat
+              {t('common.close')}
             </Button>
           </div>
         ) : (
@@ -501,10 +505,10 @@ export default function ProductionPage() {
               background: '#f0f5ff', borderRadius: 10, padding: '10px 14px',
               marginBottom: 16, border: '1px solid #adc6ff',
             }}>
-              <Text type="secondary" style={{ fontSize: 12 }}>Sipariş:</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>{t('production.productName')}:</Text>
               <Text strong style={{ marginLeft: 8 }}>{completing?.product_name}</Text>
               <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
-                — {completing?.buyer_name} · Beklenen: {Math.round(Number(completing?.expected_qty))} Paket (1 kg/paket)
+                — {completing?.buyer_name} · {t('production.expectedQty')}: {Math.round(Number(completing?.expected_qty))} {t('production.packageUnit')} (1 kg / {t('production.packageUnit')})
               </Text>
             </div>
 
@@ -514,17 +518,17 @@ export default function ProductionPage() {
               border: '1px solid #e2e8f0', marginBottom: 14,
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
-                <Text type="secondary">Toplam Hammadde Girdisi:</Text>
-                <Text strong>{orderInputKg > 0 ? `${orderInputKg.toFixed(2)} kg` : 'Hesaplanıyor...'}</Text>
+                <Text type="secondary">{t('production.rawCostLabel')}:</Text>
+                <Text strong>{orderInputKg > 0 ? `${orderInputKg.toFixed(2)} kg` : '—'}</Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
-                <Text type="secondary">Net Ambalajlanan Mamul:</Text>
+                <Text type="secondary">{t('production.actualQty')}:</Text>
                 <Text strong style={{ color: '#2563eb' }}>
-                  {Number(actualQty || 0) * 1.0} kg ({actualQty || 0} Paket)
+                  {Number(actualQty || 0) * 1.0} kg ({actualQty || 0} {t('production.packageUnit')})
                 </Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
-                <Text type="secondary">Oluşan Fire / Dolum Kaybı:</Text>
+                <Text type="secondary">{t('production.fireOccurred')}:</Text>
                 <Tag color={orderInputKg > 0 && ((Math.max(0, orderInputKg - (Number(actualQty || 0) * 1.0)) / orderInputKg) * 100) > 20 ? 'volcano' : 'green'}>
                   {orderInputKg > 0 ? Math.max(0, orderInputKg - (Number(actualQty || 0) * 1.0)).toFixed(2) : '0.00'} kg
                   {orderInputKg > 0 ? ` (%${((Math.max(0, orderInputKg - (Number(actualQty || 0) * 1.0)) / orderInputKg) * 100).toFixed(1)})` : ''}
@@ -537,8 +541,7 @@ export default function ProductionPage() {
                   showIcon
                   icon={<WarningOutlined />}
                   style={{ marginTop: 8, fontSize: 11 }}
-                  message="⚠️ Anomali Uyarısı: Yüksek Fire Oranı"
-                  description={`Girilen paket sayısı %${((Math.max(0, orderInputKg - (Number(actualQty || 0) * 1.0)) / orderInputKg) * 100).toFixed(1)} oranında fire oluşturmaktadır (Standart tavan eşik: %20.0). Lütfen tartımı teyit ediniz.`}
+                  message={t('production.fireAnomalyWarn')}
                 />
               )}
             </div>
@@ -546,13 +549,13 @@ export default function ProductionPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <Text style={{ fontSize: 13, display: 'block', marginBottom: 6 }}>
-                  Gerçek Üretilen Tam Paket Adedi (1 kg / Paket)
+                  {t('production.actualQtyInputLabel')}
                 </Text>
                 <InputNumber
                   min={1} step={1} precision={0}
                   value={actualQty}
                   onChange={v => setActualQty(v ? Math.round(v) : null)}
-                  addonAfter="Paket"
+                  addonAfter={t('production.packageUnit')}
                   style={{ width: '100%' }}
                   size="large"
                 />
@@ -560,7 +563,7 @@ export default function ProductionPage() {
 
               <div>
                 <Text style={{ fontSize: 13, display: 'block', marginBottom: 6 }}>
-                  Hizmet Bedeli (toplam fason işçilik faturası tutarı)
+                  {t('production.serviceCost')}
                 </Text>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <InputNumber
@@ -580,14 +583,14 @@ export default function ProductionPage() {
                 <EurEquivalentPreview amount={serviceCost} currency={serviceCurrency} />
                 {serviceCost && actualQty && actualQty > 0 && (
                   <Text type="secondary" style={{ fontSize: 11, marginTop: 4, display: 'block' }}>
-                    Paket Başına Hizmet: {formatMoney(serviceCost / actualQty, serviceCurrency)} / paket
+                    {t('production.servicePerPackage')}: {formatMoney(serviceCost / actualQty, serviceCurrency)} / {t('production.packageUnit').toLowerCase()}
                   </Text>
                 )}
               </div>
 
               <div>
                 <Text style={{ fontSize: 13, display: 'block', marginBottom: 6 }}>
-                  Üretim Tarihi
+                  {t('production.dateLabel')}
                 </Text>
                 <DatePicker
                   format="DD.MM.YYYY"
@@ -598,26 +601,6 @@ export default function ProductionPage() {
                 />
               </div>
 
-              {/* Anlık EKP önizleme */}
-              {actualQty && serviceCost && actualQty > 0 && (
-                <div style={{
-                  padding: '10px 14px', background: '#fffbe6', borderRadius: 8,
-                  border: '1px solid #ffe58f',
-                }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    Tahmini EKP (hammadde maliyeti hariç): Hizmet / Paket ={' '}
-                    <strong>{(serviceCost / actualQty).toFixed(4)} €/paket</strong>
-                    <br />
-                    (Tüm hammadde maliyeti + fason hizmet bedeli çıkan {actualQty} tam pakete bölünerek net EKP belirlenir)
-                  </Text>
-                </div>
-              )}
-
-              <Alert
-                type="info" showIcon style={{ fontSize: 12 }}
-                message="Tamamlandığında fire kaydedilir, paket başına EKP hesaplanır ve mamul lotu işletmenin stoğuna aktarılır."
-              />
-
               <Button
                 type="primary" block size="large"
                 loading={submitting}
@@ -625,7 +608,7 @@ export default function ProductionPage() {
                 onClick={submitComplete}
                 icon={<CheckCircleFilled />}
               >
-                Üretimi Tamamla ve EKP Hesapla
+                {t('production.completeTitle')}
               </Button>
             </div>
           </div>

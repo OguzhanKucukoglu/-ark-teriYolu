@@ -20,6 +20,7 @@ import LotTracePage from './pages/shared/LotTracePage';
 import RecallPage from './pages/shared/RecallPage';
 import ReportsPage from './pages/shared/ReportsPage';
 import { InvoicesPage } from './pages/shared/InvoicesPage';
+import { LanguageProvider } from './i18n';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -28,43 +29,45 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login"    element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route
-          path="/"
-          element={
-            <PrivateRoute>
-              <MainLayout />
-            </PrivateRoute>
-          }
-        >
-          <Route index                           element={<DashboardPage />} />
-          {/* İşletme */}
-          <Route path="butchery"                 element={<ButcheryPage />} />
-          <Route path="raw-materials"            element={<RawMaterialsPage />} />
-          <Route path="orders"                   element={<OrdersPage />} />
-          <Route path="producer-listings"        element={<ProducerListingsPage />} />
-          <Route path="farmer-listings"          element={<FarmerListingsPage />} />
-          <Route path="sales"                    element={<FarmerSalesPage />} />
-          {/* Üretici */}
-          <Route path="producer-listings-manage" element={<ProducerListingsManagePage />} />
-          <Route path="production"               element={<ProductionPage />} />
-          <Route path="producer-orders"          element={<ProducerOrdersPage />} />
-          <Route path="sucukcu/production"       element={<ProductionPage />} />
-          <Route path="sucukcu/producer-orders"  element={<ProducerOrdersPage />} />
-          {/* Market */}
-          <Route path="market-listings"          element={<MarketListingsPage />} />
-          <Route path="purchases"                element={<PurchasesPage />} />
-          {/* Ortak */}
-          <Route path="lots"                     element={<LotsPage />} />
-          <Route path="lots/:id/trace"           element={<LotTracePage />} />
-          <Route path="recalls"                  element={<RecallPage />} />
-          <Route path="reports"                  element={<ReportsPage />} />
-          <Route path="invoices"                 element={<InvoicesPage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <LanguageProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login"    element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route
+            path="/"
+            element={
+              <PrivateRoute>
+                <MainLayout />
+              </PrivateRoute>
+            }
+          >
+            <Route index                           element={<DashboardPage />} />
+            {/* İşletme */}
+            <Route path="butchery"                 element={<ButcheryPage />} />
+            <Route path="raw-materials"            element={<RawMaterialsPage />} />
+            <Route path="orders"                   element={<OrdersPage />} />
+            <Route path="producer-listings"        element={<ProducerListingsPage />} />
+            <Route path="farmer-listings"          element={<FarmerListingsPage />} />
+            <Route path="sales"                    element={<FarmerSalesPage />} />
+            {/* Üretici */}
+            <Route path="producer-listings-manage" element={<ProducerListingsManagePage />} />
+            <Route path="production"               element={<ProductionPage />} />
+            <Route path="producer-orders"          element={<ProducerOrdersPage />} />
+            <Route path="sucukcu/production"       element={<ProductionPage />} />
+            <Route path="sucukcu/producer-orders"  element={<ProducerOrdersPage />} />
+            {/* Market */}
+            <Route path="market-listings"          element={<MarketListingsPage />} />
+            <Route path="purchases"                element={<PurchasesPage />} />
+            {/* Ortak */}
+            <Route path="lots"                     element={<LotsPage />} />
+            <Route path="lots/:id/trace"           element={<LotTracePage />} />
+            <Route path="recalls"                  element={<RecallPage />} />
+            <Route path="reports"                  element={<ReportsPage />} />
+            <Route path="invoices"                 element={<InvoicesPage />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </LanguageProvider>
   );
 }

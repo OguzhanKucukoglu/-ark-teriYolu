@@ -8,6 +8,8 @@ import dayjs from 'dayjs';
 import { orderService, invoiceService } from '../../services/api';
 import { Invoice } from '../../types';
 import { InvoiceModal } from '../../components/InvoiceModal';
+import { useTranslation } from '../../i18n';
+import { formatUnit, formatDbStatus, formatDbPart, formatDbProduct } from '../../i18n/formatters';
 
 const { Title, Text } = Typography;
 
@@ -46,6 +48,7 @@ const STATUS_MAP: Record<string, { color: string; label: string }> = {
 };
 
 export default function OrdersPage() {
+  const { t } = useTranslation();
   const { message } = App.useApp();
   const [orders, setOrders]         = useState<Order[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -61,10 +64,10 @@ export default function OrdersPage() {
         setSelectedInvoice(data[0]);
         setInvoiceModalVisible(true);
       } else {
-        message.warning('Bu siparişe ait fatura bulunamadı');
+        message.warning(t('common.noData'));
       }
     } catch {
-      message.error('Fatura yüklenemedi');
+      message.error(t('common.error'));
     }
   }
 
@@ -73,7 +76,7 @@ export default function OrdersPage() {
       const { data } = await orderService.getAll();
       setOrders(data);
     } catch {
-      message.error('Siparişler yüklenemedi');
+      message.error(t('common.error'));
     } finally {
       setLoading(false);
     }
@@ -87,39 +90,40 @@ export default function OrdersPage() {
       setDetail(data);
       setDetailOpen(true);
     } catch {
-      message.error('Detay yüklenemedi');
+      message.error(t('common.error'));
     }
   }
 
   const columns = [
     {
-      title: 'Üretici', dataIndex: 'seller_name', key: 'seller_name',
+      title: t('roles.sucukcu'), dataIndex: 'seller_name', key: 'seller_name',
       render: (v: string) => <Text strong>{v}</Text>,
     },
     {
-      title: 'Ürün', dataIndex: 'product_name', key: 'product_name',
+      title: t('production.productName'), dataIndex: 'product_name', key: 'product_name',
+      render: (v: string) => <strong>{formatDbProduct(v, t)}</strong>,
     },
     {
-      title: 'Beklenen Miktar', dataIndex: 'expected_qty', key: 'expected_qty',
-      render: (v: number) => `${Math.round(Number(v))} Paket (1 kg/paket)`,
+      title: t('production.expectedQty'), dataIndex: 'expected_qty', key: 'expected_qty',
+      render: (v: number) => `${Math.round(Number(v))} ${t('production.packageUnit')}`,
     },
     {
-      title: 'Durum', dataIndex: 'status', key: 'status',
+      title: t('common.status'), dataIndex: 'status', key: 'status',
       render: (v: string) => {
-        const s = STATUS_MAP[v] ?? { color: 'default', label: v };
-        return <Tag color={s.color}>{s.label}</Tag>;
+        const s = STATUS_MAP[v] ?? { color: 'default' };
+        return <Tag color={s.color}>{formatDbStatus(v, t)}</Tag>;
       },
     },
     {
-      title: 'Tarih', dataIndex: 'order_date', key: 'order_date',
+      title: t('common.date'), dataIndex: 'order_date', key: 'order_date',
       render: (v: string) => dayjs(v).format('DD.MM.YYYY HH:mm'),
     },
     {
-      title: 'İşlemler', key: 'action',
+      title: t('common.actions'), key: 'action',
       render: (_: unknown, r: Order) => (
         <Space size="small">
           <Button size="small" icon={<EyeOutlined />} onClick={() => viewDetail(r.id)}>
-            Detay
+            {t('common.details')}
           </Button>
           {r.status === 'tamamlandi' && (
             <Button
@@ -127,7 +131,7 @@ export default function OrdersPage() {
               icon={<FileTextOutlined />}
               onClick={() => openInvoice(r.id)}
             >
-              Fatura
+              {t('invoices.title')}
             </Button>
           )}
         </Space>
@@ -142,16 +146,16 @@ export default function OrdersPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Title level={3} style={{ margin: 0 }}>
-          <ShoppingOutlined /> Siparişlerim
+          <ShoppingOutlined /> {t('nav.orders')}
         </Title>
         <div style={{ display: 'flex', gap: 8 }}>
-          {bekleyen > 0 && <Tag color="orange">{bekleyen} beklemede</Tag>}
-          {onaylandi > 0 && <Tag color="green">{onaylandi} onaylandı</Tag>}
+          {bekleyen > 0 && <Tag color="orange">{bekleyen} {t('common.pending')}</Tag>}
+          {onaylandi > 0 && <Tag color="green">{onaylandi} {t('common.confirm')}</Tag>}
         </div>
       </div>
 
       {orders.length === 0 && !loading ? (
-        <Empty description="Henüz sipariş vermediniz" />
+        <Empty description={t('common.noData')} />
       ) : (
         <Table
           dataSource={orders} columns={columns} rowKey="id"
@@ -168,10 +172,10 @@ export default function OrdersPage() {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <ShoppingOutlined />
-            <span>Sipariş #{detail?.order.id}</span>
+            <span>{t('orders.detailTitle')} #{detail?.order.id}</span>
             {detail && (
               <Tag color={STATUS_MAP[detail.order.status]?.color ?? 'default'}>
-                {STATUS_MAP[detail.order.status]?.label ?? detail.order.status}
+                {detail.order.status === 'beklemede' ? t('common.pending') : detail.order.status === 'uretimde' ? t('common.inProduction') : detail.order.status === 'tamamlandi' ? t('common.completed') : (STATUS_MAP[detail.order.status]?.label ?? detail.order.status)}
               </Tag>
             )}
           </div>
@@ -185,7 +189,7 @@ export default function OrdersPage() {
               marginBottom: 16, border: '1px solid #adc6ff',
             }}>
               <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 6 }}>
-                Üretici Bilgileri
+                {t('roles.sucukcu')}
               </Text>
               <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                 <div>
@@ -205,16 +209,16 @@ export default function OrdersPage() {
             </div>
 
             <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
-              <Descriptions.Item label="Ürün">{detail.order.product_name}</Descriptions.Item>
-              <Descriptions.Item label="Beklenen Miktar">
-                <Text strong style={{ color: '#52c41a' }}>{Math.round(Number(detail.order.expected_qty))} Paket</Text>
-                <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>(Standart 1 kg/paket)</Text>
+              <Descriptions.Item label={t('production.productName')}>{detail.order.product_name}</Descriptions.Item>
+              <Descriptions.Item label={t('production.expectedQty')}>
+                <Text strong style={{ color: '#52c41a' }}>{Math.round(Number(detail.order.expected_qty))} {t('production.packageUnit')}</Text>
+                <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>(1 kg / {t('production.packageUnit')})</Text>
               </Descriptions.Item>
-              <Descriptions.Item label="Sipariş Tarihi" span={2}>
+              <Descriptions.Item label={t('orders.orderDate')} span={2}>
                 {dayjs(detail.order.order_date).format('DD.MM.YYYY HH:mm')}
               </Descriptions.Item>
               {detail.order.notes && (
-                <Descriptions.Item label="Not" span={2}>
+                <Descriptions.Item label={t('common.notes')} span={2}>
                   {detail.order.notes}
                 </Descriptions.Item>
               )}
@@ -230,9 +234,9 @@ export default function OrdersPage() {
                       padding: '6px 12px', background: '#fafafa', borderRadius: 6,
                       border: '1px solid #f0f0f0',
                     }}>
-                      <Text>{rm.material_type}</Text>
+                      <Text>{formatDbPart(rm.material_type, t)}</Text>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <Tag color="blue">{Number(rm.quantity).toFixed(2)} {rm.unit}</Tag>
+                        <Tag color="blue">{Number(rm.quantity).toFixed(2)} {formatUnit(rm.unit, t)}</Tag>
                         <Tag>{rm.lot_number}</Tag>
                       </div>
                     </div>
@@ -248,7 +252,7 @@ export default function OrdersPage() {
                 background: '#fffbe6', borderRadius: 8, border: '1px solid #ffe58f',
               }}>
                 <Text style={{ fontSize: 12 }}>
-                  ⏳ Üreticinin onayı bekleniyor. Onaylandığında hammaddeler stoğunuzdan düşülecektir.
+                  {t('orders.waitingProducerApproval')}
                 </Text>
               </div>
             )}
@@ -258,7 +262,7 @@ export default function OrdersPage() {
                 background: '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f',
               }}>
                 <Text style={{ fontSize: 12, color: '#52c41a' }}>
-                  ✅ Sipariş onaylandı. Hammaddeler stoğunuzdan düşüldü.
+                  {t('orders.orderApprovedNotice')}
                 </Text>
               </div>
             )}

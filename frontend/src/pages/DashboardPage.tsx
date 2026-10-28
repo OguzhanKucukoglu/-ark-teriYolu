@@ -4,6 +4,7 @@ import { ShoppingCartOutlined, AuditOutlined, WarningOutlined, CheckCircleOutlin
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { notificationService } from '../services/api';
+import { useTranslation } from '../i18n';
 
 const { Title, Text } = Typography;
 
@@ -18,6 +19,7 @@ interface NotificationItem {
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [qualityAlerts, setQualityAlerts] = useState<NotificationItem[]>([]);
 
@@ -31,14 +33,14 @@ export default function DashboardPage() {
   }, []);
 
   const roleWelcome: Record<string, string> = {
-    hayvanci: 'Hayvanlarınızı parçalayın, üreticilere sipariş verin, marketlere satın.',
-    sucukcu:  'Gelen siparişleri yönetin, üretim emirleri oluşturun, EKP hesaplayın.',
-    market:   'İşletme ilanlarını inceleyin, lot bazlı satın alın, sorun bildirin.',
+    hayvanci: t('dashboard.welcomeHayvanci'),
+    sucukcu:  t('dashboard.welcomeSucukcu'),
+    market:   t('dashboard.welcomeMarket'),
   };
 
   return (
     <div>
-      <Title level={3}>Hoş Geldiniz, {user?.name} 👋</Title>
+      <Title level={3}>{t('dashboard.welcome')}, {user?.name} 👋</Title>
       <Text type="secondary">{roleWelcome[user?.role || '']}</Text>
 
       {qualityAlerts.length > 0 && (
@@ -46,10 +48,10 @@ export default function DashboardPage() {
           style={{ marginTop: 16, marginBottom: 16 }}
           message={
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>⚠️ <strong>Dikkat:</strong> Marketlerden <strong>{qualityAlerts.length} adet</strong> lot kalite sorunu bildirimi alındı!</span>
+              <span>⚠️ <strong>{t('common.error')}:</strong> {qualityAlerts.length} {t('market.recalledProducts')}</span>
               <Space>
                 <Button size="small" danger onClick={() => navigate('/recalls')}>
-                  Geri Çağırma Yönetimi
+                  {t('nav.recalls')}
                 </Button>
               </Space>
             </div>
@@ -70,8 +72,8 @@ export default function DashboardPage() {
 
       <Alert
         style={{ marginTop: qualityAlerts.length > 0 ? 0 : 16, marginBottom: 24 }}
-        message="Demo Verisi Yüklü"
-        description="Sistem ET-2026-001 → URT-2026-045 → SUC-2026-045 lot zinciriyle yapılandırılmıştır. Lot izlenebilirliği ve geri çağırma demo senaryosunu test edebilirsiniz."
+        message={t('dashboard.demoDataLoaded')}
+        description={t('dashboard.demoDataDesc')}
         type="info"
         showIcon
       />
@@ -79,22 +81,22 @@ export default function DashboardPage() {
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} lg={6}>
           <Card>
-            <Statistic title="Aktif Lotlar" value={4} prefix={<AuditOutlined />} valueStyle={{ color: '#1890ff' }} />
+            <Statistic title={t('dashboard.activeLots')} value={4} prefix={<AuditOutlined />} valueStyle={{ color: '#1890ff' }} />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card>
-            <Statistic title="Açık Siparişler" value={1} prefix={<ShoppingCartOutlined />} valueStyle={{ color: '#52c41a' }} />
+            <Statistic title={t('dashboard.pendingOrders')} value={1} prefix={<ShoppingCartOutlined />} valueStyle={{ color: '#52c41a' }} />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card>
-            <Statistic title="Geri Çağırmalar" value={0} prefix={<WarningOutlined />} valueStyle={{ color: '#fa8c16' }} />
+            <Statistic title={t('nav.recalls')} value={0} prefix={<WarningOutlined />} valueStyle={{ color: '#fa8c16' }} />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card>
-            <Statistic title="Tamamlanan Üretim" value={1} prefix={<CheckCircleOutlined />} valueStyle={{ color: '#52c41a' }} />
+            <Statistic title={t('production.title')} value={1} prefix={<CheckCircleOutlined />} valueStyle={{ color: '#52c41a' }} />
           </Card>
         </Col>
       </Row>

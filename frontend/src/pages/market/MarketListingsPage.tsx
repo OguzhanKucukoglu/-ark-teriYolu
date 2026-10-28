@@ -9,6 +9,8 @@ import {
 } from '@ant-design/icons';
 import { listingService, purchaseService } from '../../services/api';
 import { formatMoney } from '../../utils/currency';
+import { useTranslation } from '../../i18n';
+import { formatUnit } from '../../i18n/formatters';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -39,6 +41,7 @@ interface FarmerListing {
 
 export default function MarketListingsPage() {
   const { message } = App.useApp();
+  const { t } = useTranslation();
 
   const [listings, setListings] = useState<FarmerListing[]>([]);
   const [filtered, setFiltered] = useState<FarmerListing[]>([]);
@@ -84,9 +87,9 @@ export default function MarketListingsPage() {
     <div>
       {/* Başlık */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <Title level={3} style={{ margin: 0 }}>🛒 Ürün İlanları</Title>
+        <Title level={3} style={{ margin: 0 }}>🛒 {t('market.title')}</Title>
         <Search
-          placeholder="Ürün veya işletme ara..."
+          placeholder={t('market.searchPlaceholder')}
           allowClear style={{ width: 280 }}
           prefix={<SearchOutlined />}
           value={search}
@@ -151,7 +154,7 @@ export default function MarketListingsPage() {
                     paddingTop: 8, borderTop: '1px solid #f0f0f0',
                   }}>
                     <Text strong style={{ color: '#52c41a', fontSize: 14 }}>
-                      Toplam: {formatMoney(total, listing.currency, true)}
+                      {t('common.total')}: {formatMoney(total, listing.currency, true)}
                     </Text>
                     <Button
                       size="small" icon={<InfoCircleOutlined />}
@@ -161,7 +164,7 @@ export default function MarketListingsPage() {
                         setDetailOpen(true);
                       }}
                     >
-                      Detay
+                      {t('common.details')}
                     </Button>
                   </div>
                 </Card>
@@ -182,7 +185,7 @@ export default function MarketListingsPage() {
               setBuyListing(selected);
               setBuyOpen(true);
             }}>
-            Satın Al
+            {t('market.buyNow')}
           </Button>
         }
         width={480}
@@ -191,33 +194,33 @@ export default function MarketListingsPage() {
             <span style={{ fontSize: 20 }}>
               {selected?.lot_number.startsWith('SUC') || selected?.lot_number.startsWith('MAM') ? '🌭' : '🥩'}
             </span>
-            <span>{selected?.product_name} — Detay</span>
+            <span>{selected?.product_name} — {t('market.detailTitle')}</span>
           </div>
         }
       >
         {selected && (
           <div>
             <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
-              <Descriptions.Item label="Satıcı" span={2}>
+              <Descriptions.Item label={t('market.seller')} span={2}>
                 <Text strong>{selected.farmer_name}</Text>
               </Descriptions.Item>
               {selected.phone && (
-                <Descriptions.Item label={<><PhoneOutlined /> Telefon</>} span={2}>
+                <Descriptions.Item label={<><PhoneOutlined /> {t('common.phone')}</>} span={2}>
                   {selected.phone}
                 </Descriptions.Item>
               )}
-              <Descriptions.Item label="Lot No">
+              <Descriptions.Item label={t('common.lotNumber')}>
                 <Tag color="blue">{selected.lot_number}</Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="Miktar">
+              <Descriptions.Item label={t('common.quantity')}>
                 <Text strong>{Number(selected.quantity).toFixed(2)} {selected.unit}</Text>
               </Descriptions.Item>
-              <Descriptions.Item label="Birim Fiyat">
+              <Descriptions.Item label={t('common.unitPrice')}>
                 <Text strong style={{ color: '#f50' }}>
                   {formatMoney(selected.unit_price, selected.currency)} / {selected.unit}
                 </Text>
               </Descriptions.Item>
-              <Descriptions.Item label="Toplam Değer">
+              <Descriptions.Item label={t('listings.totalValue')}>
                 <Text strong style={{ color: '#52c41a' }}>
                   {formatMoney(Number(selected.quantity) * Number(selected.unit_price), selected.currency, true)}
                 </Text>
@@ -241,7 +244,7 @@ export default function MarketListingsPage() {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <ShoppingCartOutlined style={{ color: '#1890ff', fontSize: 20 }} />
-            <span>{buyListing?.product_name} — Satın Al</span>
+            <span>{buyListing?.product_name} — {t('market.buyNow')}</span>
           </div>
         }
       >
@@ -268,6 +271,7 @@ function BuyForm({
   onSuccess: () => void;
 }) {
   const { message } = App.useApp();
+  const { t } = useTranslation();
   const [qty, setQty]         = useState<number>(Math.min(1, Number(listing.quantity)));
   const [submitting, setSubmitting] = useState(false);
   const price = Number(listing.unit_price);
@@ -307,27 +311,27 @@ function BuyForm({
       }}>
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
           <div>
-            <Text type="secondary" style={{ fontSize: 11 }}>Satıcı</Text>
+            <Text type="secondary" style={{ fontSize: 11 }}>{t('market.seller')}</Text>
             <div><Text strong>{listing.farmer_name}</Text></div>
           </div>
           {listing.phone && (
             <div>
-              <Text type="secondary" style={{ fontSize: 11 }}>Telefon</Text>
+              <Text type="secondary" style={{ fontSize: 11 }}>{t('common.phone')}</Text>
               <div><PhoneOutlined style={{ marginRight: 4 }} />{listing.phone}</div>
             </div>
           )}
           <div>
-            <Text type="secondary" style={{ fontSize: 11 }}>Lot</Text>
+            <Text type="secondary" style={{ fontSize: 11 }}>{t('common.lotNumber')}</Text>
             <div><Tag color="blue">{listing.lot_number}</Tag></div>
           </div>
         </div>
       </div>
 
-      <Divider style={{ margin: '0 0 16px' }}>Sipariş Detayı</Divider>
+      <Divider style={{ margin: '0 0 16px' }}>{t('market.buyModalTitle')}</Divider>
 
       <div style={{ marginBottom: 16 }}>
         <Text style={{ fontSize: 13, display: 'block', marginBottom: 6 }}>
-          Almak istediğiniz miktar ({listing.unit})
+          {t('listings.quantity')} ({formatUnit(listing.unit, t)})
         </Text>
         <InputNumber
           min={0.001}
@@ -336,12 +340,12 @@ function BuyForm({
           precision={3}
           value={qty}
           onChange={v => setQty(v ?? 0.001)}
-          addonAfter={listing.unit}
+          addonAfter={formatUnit(listing.unit, t)}
           style={{ width: '100%' }}
           size="large"
         />
         <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 4 }}>
-          Maksimum: {Number(listing.quantity).toFixed(2)} {listing.unit}
+          {t('market.inStock')}: {Number(listing.quantity).toFixed(2)} {formatUnit(listing.unit, t)}
         </Text>
       </div>
 
@@ -351,16 +355,16 @@ function BuyForm({
         borderRadius: 10, padding: '14px 18px', marginBottom: 16,
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-          <Text type="secondary">Birim Fiyat</Text>
-          <Text>{formatMoney(price, listing.currency)} / {listing.unit}</Text>
+          <Text type="secondary">{t('common.unitPrice')}</Text>
+          <Text>{formatMoney(price, listing.currency)} / {formatUnit(listing.unit, t)}</Text>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-          <Text type="secondary">Miktar</Text>
-          <Text>{qty.toFixed(3)} {listing.unit}</Text>
+          <Text type="secondary">{t('common.quantity')}</Text>
+          <Text>{qty.toFixed(3)} {formatUnit(listing.unit, t)}</Text>
         </div>
         <Divider style={{ margin: '8px 0' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <Text strong style={{ fontSize: 15 }}>Toplam</Text>
+          <Text strong style={{ fontSize: 15 }}>{t('common.total')}</Text>
           <Text strong style={{ fontSize: 18, color: '#52c41a' }}>{formatMoney(total, listing.currency, true)}</Text>
         </div>
       </div>
@@ -370,7 +374,7 @@ function BuyForm({
         loading={submitting}
         onClick={handleBuy}
       >
-        Satın Al
+        {t('market.buyNow')}
       </Button>
     </div>
   );

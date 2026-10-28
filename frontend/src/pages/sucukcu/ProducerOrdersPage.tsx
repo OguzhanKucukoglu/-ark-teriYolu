@@ -9,6 +9,8 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { orderService } from '../../services/api';
+import { useTranslation } from '../../i18n';
+import { formatUnit, formatDbStatus, formatDbPart } from '../../i18n/formatters';
 
 const { Title, Text } = Typography;
 
@@ -46,6 +48,7 @@ const STATUS_MAP: Record<string, { color: string; label: string }> = {
 };
 
 export default function ProducerOrdersPage() {
+  const { t } = useTranslation();
   const { message } = App.useApp();
   const navigate = useNavigate();
   const [orders, setOrders]     = useState<Order[]>([]);
@@ -100,57 +103,56 @@ export default function ProducerOrdersPage() {
 
   const columns = [
     {
-      title: 'İşletme', dataIndex: 'buyer_name', key: 'buyer_name',
+      title: t('production.farmLabel'), dataIndex: 'buyer_name', key: 'buyer_name',
       render: (v: string) => <Text strong>{v}</Text>,
     },
     {
-      title: 'Ürün', dataIndex: 'product_name', key: 'product_name',
+      title: t('production.productName'), dataIndex: 'product_name', key: 'product_name',
     },
     {
-      title: 'Beklenen Miktar', dataIndex: 'expected_qty', key: 'expected_qty',
-      render: (v: number) => <Tag color="blue">{Math.round(Number(v))} Paket</Tag>,
+      title: t('production.expectedQty'), dataIndex: 'expected_qty', key: 'expected_qty',
+      render: (v: number) => <Tag color="blue">{Math.round(Number(v))} {t('production.packageUnit')}</Tag>,
     },
     {
-      title: 'Durum', dataIndex: 'status', key: 'status',
+      title: t('common.status'), dataIndex: 'status', key: 'status',
       render: (v: string) => {
-        const s = STATUS_MAP[v] ?? { color: 'default', label: v };
-        return <Tag color={s.color}>{s.label}</Tag>;
+        const s = STATUS_MAP[v] ?? { color: 'default' };
+        return <Tag color={s.color}>{formatDbStatus(v, t)}</Tag>;
       },
     },
     {
-      title: 'Tarih', dataIndex: 'order_date', key: 'order_date',
+      title: t('common.date'), dataIndex: 'order_date', key: 'order_date',
       render: (v: string) => dayjs(v).format('DD.MM.YYYY HH:mm'),
     },
     {
-      title: 'İşlemler', key: 'actions',
+      title: t('common.actions'), key: 'actions',
       render: (_: unknown, r: Order) => (
         <Space>
           <Button size="small" icon={<EyeOutlined />} onClick={() => viewDetail(r.id)}>
-            Detay
+            {t('common.details')}
           </Button>
           {r.status === 'beklemede' && (
             <>
               <Popconfirm
-                title="Siparişi onaylayıp üretime almak istiyor musunuz?"
-                description="Onaylandığında hammaddeler düşülecek ve üretim emri otomatik başlatılacaktır."
+                title={t('orders.confirmOrderTitle')}
                 onConfirm={() => updateStatus(r.id, 'onaylandi')}
-                okText="Evet, Onayla ve Üretime Al" cancelText="Hayır"
+                okText={t('common.yes')} cancelText={t('common.no')}
                 okType="primary"
               >
                 <Button
                   size="small" type="primary" icon={<CheckOutlined />}
                   loading={updating === r.id}
                 >
-                  Onayla
+                  {t('common.confirm')}
                 </Button>
               </Popconfirm>
               <Popconfirm
-                title="Siparişi iptal etmek istiyor musunuz?"
+                title={t('orders.cancelOrderTitle')}
                 onConfirm={() => updateStatus(r.id, 'iptal')}
-                okText="Evet" cancelText="Hayır" okType="danger"
+                okText={t('common.yes')} cancelText={t('common.no')} okType="danger"
               >
                 <Button size="small" danger icon={<CloseOutlined />}>
-                  Reddet
+                  {t('common.cancel')}
                 </Button>
               </Popconfirm>
             </>
@@ -164,9 +166,9 @@ export default function ProducerOrdersPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Title level={3} style={{ margin: 0 }}>
-          <ShoppingOutlined /> Gelen Siparişler
+          <ShoppingOutlined /> {t('orders.title')}
         </Title>
-        <Tag color="blue">{orders.filter(o => o.status === 'beklemede').length} bekleyen</Tag>
+        <Tag color="blue">{orders.filter(o => o.status === 'beklemede').length} {t('common.pending')}</Tag>
       </div>
 
       <Table
@@ -183,21 +185,20 @@ export default function ProducerOrdersPage() {
           detail?.order.status === 'beklemede' ? (
             <Space>
               <Popconfirm
-                title="Siparişi iptal etmek istiyor musunuz?"
+                title={t('orders.cancelOrderTitle')}
                 onConfirm={() => updateStatus(detail.order.id, 'iptal')}
-                okText="Evet" cancelText="Hayır" okType="danger"
+                okText={t('common.yes')} cancelText={t('common.no')} okType="danger"
               >
-                <Button danger icon={<CloseOutlined />}>Reddet</Button>
+                <Button danger icon={<CloseOutlined />}>{t('common.cancel')}</Button>
               </Popconfirm>
               <Popconfirm
-                title="Siparişi onaylayıp üretime almak istiyor musunuz?"
-                description="Onaylandığında hammaddeler düşülecek ve üretim emri otomatik başlatılacaktır."
+                title={t('orders.confirmOrderTitle')}
                 onConfirm={() => updateStatus(detail.order.id, 'onaylandi')}
-                okText="Evet, Onayla ve Üretime Al" cancelText="Hayır" okType="primary"
+                okText={t('common.yes')} cancelText={t('common.no')} okType="primary"
               >
                 <Button type="primary" icon={<CheckOutlined />}
                   loading={updating === detail?.order.id}>
-                  Onayla
+                  {t('common.confirm')}
                 </Button>
               </Popconfirm>
             </Space>
@@ -207,10 +208,10 @@ export default function ProducerOrdersPage() {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <ShoppingOutlined />
-            <span>Sipariş #{detail?.order.id} — Detay</span>
+            <span>{t('orders.detailTitle')} #{detail?.order.id}</span>
             {detail && (
               <Tag color={STATUS_MAP[detail.order.status]?.color ?? 'default'}>
-                {STATUS_MAP[detail.order.status]?.label ?? detail.order.status}
+                {detail.order.status === 'beklemede' ? t('common.pending') : detail.order.status === 'uretimde' ? t('common.inProduction') : detail.order.status === 'tamamlandi' ? t('common.completed') : (STATUS_MAP[detail.order.status]?.label ?? detail.order.status)}
               </Tag>
             )}
           </div>
@@ -219,19 +220,19 @@ export default function ProducerOrdersPage() {
         {detail && (
           <div>
             <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
-              <Descriptions.Item label="İşletme" span={2}>
+              <Descriptions.Item label={t('production.farmLabel')} span={2}>
                 <Text strong>{detail.order.buyer_name}</Text>
               </Descriptions.Item>
-              <Descriptions.Item label="Ürün">{detail.order.product_name}</Descriptions.Item>
-              <Descriptions.Item label="Beklenen Miktar">
-                <Text strong style={{ color: '#52c41a' }}>{Math.round(Number(detail.order.expected_qty))} Paket</Text>
-                <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>(Standart 1 kg/paket)</Text>
+              <Descriptions.Item label={t('production.productName')}>{detail.order.product_name}</Descriptions.Item>
+              <Descriptions.Item label={t('production.expectedQty')}>
+                <Text strong style={{ color: '#52c41a' }}>{Math.round(Number(detail.order.expected_qty))} {t('production.packageUnit')}</Text>
+                <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>(1 kg / {t('production.packageUnit')})</Text>
               </Descriptions.Item>
-              <Descriptions.Item label="Sipariş Tarihi" span={2}>
+              <Descriptions.Item label={t('orders.orderDate')} span={2}>
                 {dayjs(detail.order.order_date).format('DD.MM.YYYY HH:mm')}
               </Descriptions.Item>
               {detail.order.notes && (
-                <Descriptions.Item label="Not" span={2}>
+                <Descriptions.Item label={t('common.notes')} span={2}>
                   {detail.order.notes}
                 </Descriptions.Item>
               )}
@@ -239,7 +240,7 @@ export default function ProducerOrdersPage() {
 
             {detail.rawMaterials.length > 0 && (
               <>
-                <Divider style={{ margin: '12px 0' }}>Gönderilecek Hammaddeler</Divider>
+                <Divider style={{ margin: '12px 0' }}>{t('orders.sentRawMaterials')}</Divider>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {detail.rawMaterials.map(rm => (
                     <div key={rm.id} style={{
@@ -247,9 +248,9 @@ export default function ProducerOrdersPage() {
                       padding: '6px 12px', background: '#fafafa', borderRadius: 6,
                       border: '1px solid #f0f0f0',
                     }}>
-                      <Text>{rm.material_type}</Text>
+                      <Text>{formatDbPart(rm.material_type, t)}</Text>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <Tag color="blue">{Number(rm.quantity).toFixed(2)} {rm.unit}</Tag>
+                        <Tag color="blue">{Number(rm.quantity).toFixed(2)} {formatUnit(rm.unit, t)}</Tag>
                         <Tag>{rm.lot_number}</Tag>
                       </div>
                     </div>
@@ -261,7 +262,7 @@ export default function ProducerOrdersPage() {
             {detail.order.status === 'beklemede' && (
               <Alert
                 type="warning" showIcon style={{ marginTop: 16, fontSize: 12 }}
-                message="Onayladığınızda hammaddeler işletmenin stoğundan otomatik düşülecektir."
+                message={t('orders.approveStockNotice')}
               />
             )}
           </div>

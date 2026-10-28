@@ -11,6 +11,8 @@ import { purchaseService, invoiceService } from '../../services/api';
 import { Invoice } from '../../types';
 import { InvoiceModal } from '../../components/InvoiceModal';
 import { formatMoney, convertToEur } from '../../utils/currency';
+import { useTranslation } from '../../i18n';
+import { formatUnit, formatDbStatus } from '../../i18n/formatters';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -44,6 +46,7 @@ const STATUS_MAP: Record<string, { color: string; label: string }> = {
 
 export default function PurchasesPage() {
   const { message } = App.useApp();
+  const { t } = useTranslation();
 
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -128,7 +131,7 @@ export default function PurchasesPage() {
       ),
     },
     {
-      title: 'Satıcı (İşletme)', key: 'farmer',
+      title: t('market.seller'), key: 'farmer',
       render: (_: unknown, r: Purchase) => (
         <div>
           <Text strong>{r.farmer_name}</Text>
@@ -141,33 +144,33 @@ export default function PurchasesPage() {
       ),
     },
     {
-      title: 'Miktar', key: 'qty',
-      render: (_: unknown, r: Purchase) => `${Number(r.quantity).toFixed(2)} ${r.unit}`,
+      title: t('common.quantity'), key: 'qty',
+      render: (_: unknown, r: Purchase) => `${Number(r.quantity).toFixed(2)} ${formatUnit(r.unit, t)}`,
     },
     {
-      title: 'Birim Fiyat', dataIndex: 'unit_price', key: 'unit_price',
-      render: (v: number, r: Purchase) => `${formatMoney(v, r.currency)} / ${r.unit}`,
+      title: t('common.unitPrice'), dataIndex: 'unit_price', key: 'unit_price',
+      render: (v: number, r: Purchase) => `${formatMoney(v, r.currency)} / ${formatUnit(r.unit, t)}`,
     },
     {
-      title: 'Toplam Tutar', dataIndex: 'total_price', key: 'total_price',
+      title: t('common.totalPrice'), dataIndex: 'total_price', key: 'total_price',
       render: (v: number, r: Purchase) => <Tag color="green">{formatMoney(v, r.currency, true)}</Tag>,
     },
     {
-      title: 'Durum', dataIndex: 'status', key: 'status',
+      title: t('common.status'), dataIndex: 'status', key: 'status',
       render: (v: string, r: Purchase) => {
         if (r.lot_status === 'recalled') {
-          return <Tag color="red">Geri Çağrıldı (Satış Bloke)</Tag>;
+          return <Tag color="red">{t('common.recalled')}</Tag>;
         }
-        const s = STATUS_MAP[v] ?? { color: 'default', label: v };
-        return <Tag color={s.color}>{s.label}</Tag>;
+        const s = STATUS_MAP[v] ?? { color: 'default' };
+        return <Tag color={s.color}>{formatDbStatus(v, t)}</Tag>;
       },
     },
     {
-      title: 'Tarih', dataIndex: 'purchase_date', key: 'purchase_date',
+      title: t('common.date'), dataIndex: 'purchase_date', key: 'purchase_date',
       render: (v: string) => dayjs(v).format('DD.MM.YYYY HH:mm'),
     },
     {
-      title: 'İşlem', key: 'action',
+      title: t('common.actions'), key: 'action',
       render: (_: unknown, r: Purchase) => (
         <Space size="small">
           <Button
@@ -175,7 +178,7 @@ export default function PurchasesPage() {
             icon={<FileTextOutlined />}
             onClick={() => openInvoice(r.id)}
           >
-            Fatura
+            {t('invoices.title')}
           </Button>
           <Button
             size="small"
@@ -183,7 +186,7 @@ export default function PurchasesPage() {
             icon={<WarningOutlined />}
             onClick={() => openFeedback(r)}
           >
-            Sorun Bildir
+            {t('market.reportComplaint')}
           </Button>
         </Space>
       ),
@@ -194,7 +197,7 @@ export default function PurchasesPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Title level={3} style={{ margin: 0 }}>
-          <ShoppingCartOutlined /> Satın Almalarım
+          <ShoppingCartOutlined /> {t('nav.purchases')}
         </Title>
       </div>
 
@@ -203,21 +206,21 @@ export default function PurchasesPage() {
           type="error"
           showIcon
           style={{ marginBottom: 16 }}
-          message={`Dikkat: Satın aldığınız ${recalledPurchases.length} kalem ürün için Geri Çağırma (Recall) başlatılmıştır!`}
-          description={`Etkilenen lotlar: ${[...new Set(recalledPurchases.map(p => p.lot_number))].join(', ')}. Bu ürünlerin satışı bloke edilmiştir, lütfen tedarikçi işletme ile iletişime geçiniz.`}
+          message={`${t('recalls.title')} (${recalledPurchases.length})`}
+          description={`Etkilenen lotlar: ${[...new Set(recalledPurchases.map(p => p.lot_number))].join(', ')}`}
         />
       )}
 
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={8}>
           <Card size="small">
-            <Statistic title="Toplam Alım" value={purchases.length} suffix="işlem" />
+            <Statistic title={t('market.totalPurchases')} value={purchases.length} />
           </Card>
         </Col>
         <Col span={8}>
           <Card size="small">
             <Statistic
-              title="Toplam Harcama"
+              title={t('market.totalSpent')}
               value={totalSpent.toFixed(2)}
               suffix="€"
               valueStyle={{ color: '#52c41a' }}
@@ -227,9 +230,8 @@ export default function PurchasesPage() {
         <Col span={8}>
           <Card size="small">
             <Statistic
-              title="Geri Çağrılan Ürün"
+              title={t('market.recalledProducts')}
               value={recalledPurchases.length}
-              suffix="kalem"
               valueStyle={{ color: recalledPurchases.length > 0 ? '#cf1322' : undefined }}
             />
           </Card>
@@ -237,7 +239,7 @@ export default function PurchasesPage() {
       </Row>
 
       {purchases.length === 0 && !loading ? (
-        <Empty description="Henüz satın alma işleminiz bulunmuyor" />
+        <Empty description={t('common.noData')} />
       ) : (
         <Table
           dataSource={purchases}
@@ -253,7 +255,7 @@ export default function PurchasesPage() {
         onCancel={() => setFeedbackOpen(false)}
         footer={null}
         width={440}
-        title={<><WarningOutlined style={{ color: '#faad14' }} /> Lot Kalite Sorunu Bildir</>}
+        title={<><WarningOutlined style={{ color: '#faad14' }} /> {t('market.complaintModalTitle')}</>}
       >
         {selectedPurchase && (
           <Form form={form} onFinish={onFeedbackSubmit} layout="vertical">
@@ -265,21 +267,21 @@ export default function PurchasesPage() {
               <div style={{ marginTop: 4 }}>
                 <Tag color="blue">{selectedPurchase.lot_number}</Tag>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  Satıcı: {selectedPurchase.farmer_name}
+                  {t('market.seller')}: {selectedPurchase.farmer_name}
                 </Text>
               </div>
             </div>
 
             <Form.Item
               name="issue"
-              label="Sorun Açıklaması"
-              rules={[{ required: true, min: 5, message: 'Lütfen sorunu kısaca açıklayın' }]}
+              label={t('market.complaintDesc')}
+              rules={[{ required: true, min: 5 }]}
             >
-              <TextArea rows={3} placeholder="Tespit edilen kalite/ambalaj/soğuk zincir sorununu yazın..." />
+              <TextArea rows={3} placeholder={t('market.complaintPlaceholder')} />
             </Form.Item>
 
             <Button type="primary" danger htmlType="submit" block loading={submitting}>
-              Bildirimi Gönder
+              {t('market.reportComplaint')}
             </Button>
           </Form>
         )}

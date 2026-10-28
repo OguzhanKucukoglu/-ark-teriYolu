@@ -4,6 +4,7 @@ import { CheckCircleFilled } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
 import { authService } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import { useTranslation, LanguageSwitcher } from '../../i18n';
 
 const { Title, Text } = Typography;
 
@@ -16,32 +17,33 @@ interface RoleOption {
   description: string;
 }
 
-const ROLES: RoleOption[] = [
-  {
-    key: 'hayvanci',
-    emoji: '🐄',
-    label: 'İşletme',
-    description: 'Üretim yaptırmak istiyorum',
-  },
-  {
-    key: 'sucukcu',
-    emoji: '🌭',
-    label: 'Üretici',
-    description: 'Üretim yapıyorum',
-  },
-  {
-    key: 'market',
-    emoji: '🏪',
-    label: 'Market',
-    description: 'Satış yapıyorum',
-  },
-];
-
 export default function RegisterPage() {
+  const { t } = useTranslation();
   const navigate   = useNavigate();
   const { setAuth } = useAuthStore();
   const [form]     = Form.useForm();
   const [roleForm] = Form.useForm();
+
+  const roleOptions: RoleOption[] = [
+    {
+      key: 'hayvanci',
+      emoji: '🐄',
+      label: t('roles.hayvanci'),
+      description: t('roles.hayvanciDesc'),
+    },
+    {
+      key: 'sucukcu',
+      emoji: '🌭',
+      label: t('roles.sucukcu'),
+      description: t('roles.sucukcuDesc'),
+    },
+    {
+      key: 'market',
+      emoji: '🏪',
+      label: t('roles.market'),
+      description: t('roles.marketDesc'),
+    },
+  ];
 
   // Step 1 değerleri — rol seçim modalına taşınacak
   const [step1Values, setStep1Values] = useState<{ name: string; email: string; password: string } | null>(null);
@@ -71,11 +73,11 @@ export default function RegisterPage() {
       };
       const { data } = await authService.register(payload);
       setAuth(data.user, data.token);
-      message.success('Kayıt başarılı, hoş geldiniz!');
+      message.success(t('auth.registerSuccess'));
       setModalOpen(false);
       navigate('/');
     } catch {
-      message.error('Kayıt sırasında hata oluştu. Email zaten kayıtlı olabilir.');
+      message.error(t('auth.registerError'));
     } finally {
       setSubmitting(false);
     }
@@ -85,70 +87,75 @@ export default function RegisterPage() {
     <div style={{
       minHeight: '100vh',
       display: 'flex',
+      flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
       background: 'linear-gradient(135deg, #e6f4ff 0%, #f0f2f5 100%)',
+      position: 'relative',
     }}>
+      <div style={{ position: 'absolute', top: 20, right: 24 }}>
+        <LanguageSwitcher />
+      </div>
       <Card style={{ width: 440, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', borderRadius: 12 }}>
         <Space direction="vertical" size="large" style={{ width: '100%', textAlign: 'center' }}>
           <div>
             <Title level={2} style={{ marginBottom: 4 }}>🐄 AVATAR</Title>
-            <Text type="secondary">Yeni hesap oluşturun</Text>
+            <Text type="secondary">{t('auth.systemSubtitle')}</Text>
           </div>
 
           <Form form={form} onFinish={onStep1Finish} layout="vertical" size="large" style={{ textAlign: 'left' }}>
             <Form.Item
               name="name"
-              label="Ad Soyad"
-              rules={[{ required: true, message: 'Ad Soyad zorunludur' }]}
+              label={t('auth.fullName')}
+              rules={[{ required: true }]}
             >
-              <Input placeholder="Ad Soyad" />
+              <Input placeholder={t('auth.fullName')} />
             </Form.Item>
 
             <Form.Item
               name="email"
-              label="Email"
-              rules={[{ required: true, type: 'email', message: 'Geçerli bir email girin' }]}
+              label={t('auth.email')}
+              rules={[{ required: true, type: 'email' }]}
             >
-              <Input placeholder="ornek@email.com" />
+              <Input placeholder={t('auth.email')} />
             </Form.Item>
 
             <Form.Item
               name="password"
-              label="Şifre"
-              rules={[{ required: true, min: 6, message: 'En az 6 karakter olmalı' }]}
+              label={t('auth.password')}
+              rules={[{ required: true, min: 6 }]}
             >
-              <Input.Password placeholder="Şifre" />
+              <Input.Password placeholder={t('auth.password')} />
             </Form.Item>
 
             <Form.Item
               name="confirm"
-              label="Şifre Tekrar"
+              label={t('auth.confirmPassword')}
               dependencies={['password']}
               rules={[
-                { required: true, message: 'Şifreyi tekrar girin' },
+                { required: true },
                 ({ getFieldValue }) => ({
                   validator(_, value) {
                     if (!value || getFieldValue('password') === value) {
                       return Promise.resolve();
                     }
-                    return Promise.reject(new Error('Şifreler eşleşmiyor'));
+                    return Promise.reject(new Error('Mismatch'));
                   },
                 }),
               ]}
             >
-              <Input.Password placeholder="Şifre Tekrar" />
+              <Input.Password placeholder={t('auth.confirmPassword')} />
             </Form.Item>
 
             <Form.Item style={{ marginBottom: 0 }}>
               <Button type="primary" htmlType="submit" block size="large" style={{ borderRadius: 8 }}>
-                Kayıt Ol
+                {t('auth.register')}
               </Button>
             </Form.Item>
           </Form>
 
           <Text type="secondary">
-            Zaten hesabın var mı? <Link to="/login">Giriş Yap</Link>
+            {t('auth.haveAccount')} <Link to="/login">{t('auth.login')}</Link>
           </Text>
         </Space>
       </Card>
@@ -162,14 +169,13 @@ export default function RegisterPage() {
         centered
         title={
           <div style={{ textAlign: 'center', paddingTop: 8 }}>
-            <Title level={4} style={{ marginBottom: 4 }}>Hesap Türünüzü Seçin</Title>
-            <Text type="secondary" style={{ fontSize: 13 }}>Platforma nasıl katılmak istiyorsunuz?</Text>
+            <Title level={4} style={{ marginBottom: 4 }}>{t('auth.selectRoleTitle')}</Title>
           </div>
         }
       >
         {/* Rol Kartları */}
         <div style={{ display: 'flex', gap: 12, margin: '20px 0' }}>
-          {ROLES.map(role => {
+          {roleOptions.map(role => {
             const isSelected = selectedRole === role.key;
             return (
               <div
@@ -217,14 +223,14 @@ export default function RegisterPage() {
           >
             <Form.Item
               name="business_name"
-              label="İşletme Adı"
-              rules={[{ required: true, message: 'İşletme adı zorunludur' }]}
+              label={t('auth.businessName')}
+              rules={[{ required: true, message: t('auth.businessNameRequired') }]}
             >
               <Input
                 placeholder={
-                  selectedRole === 'hayvanci' ? 'Çiftlik / işletme adı'
-                  : selectedRole === 'sucukcu' ? 'Üretim tesisi adı'
-                  : 'Market / mağaza adı'
+                  selectedRole === 'hayvanci' ? t('auth.farmPlaceholder')
+                  : selectedRole === 'sucukcu' ? t('auth.producerPlaceholder')
+                  : t('auth.marketPlaceholder')
                 }
               />
             </Form.Item>
@@ -238,13 +244,13 @@ export default function RegisterPage() {
                 loading={submitting}
                 style={{ borderRadius: 8 }}
               >
-                Kaydı Tamamla
+                {t('auth.completeRegister')}
               </Button>
             </Form.Item>
 
             <div style={{ textAlign: 'center' }}>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                Bu bilgileri daha sonra profil ayarlarından değiştirebilirsiniz.
+                {t('auth.changeLaterNotice')}
               </Text>
             </div>
           </Form>

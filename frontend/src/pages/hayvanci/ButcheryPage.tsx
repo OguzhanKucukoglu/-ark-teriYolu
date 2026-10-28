@@ -12,6 +12,7 @@ import {
 import dayjs, { Dayjs } from 'dayjs';
 import { butcheryService, mlService } from '../../services/api';
 import { formatMoney, CurrencySelect, EurEquivalentPreview } from '../../utils/currency';
+import { useTranslation } from '../../i18n';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -78,6 +79,12 @@ function getPartMultiplier(partName: string): number {
   return 1.0;
 }
 
+function getTranslatedPart(partName: string, t: (k: string) => string): string {
+  const norm = partName.toLowerCase().trim();
+  const res = t(`parts.${norm}`);
+  return (res && res !== `parts.${norm}`) ? res : partName;
+}
+
 // ── Tipler ────────────────────────────────────────────────────────────────────
 interface PartWeight {
   part_name: string;
@@ -125,6 +132,7 @@ function confidenceLabel(method: string, n: number) {
 
 // ── Ana Bileşen ───────────────────────────────────────────────────────────────
 export default function ButcheryPage() {
+  const { t } = useTranslation();
   const { message } = App.useApp();
   const [operations, setOperations] = useState<ButcheryRecord[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -388,26 +396,27 @@ export default function ButcheryPage() {
 
   const columns = [
     {
-      title: 'Küpe / Parti No', dataIndex: 'animal_ear_tag', key: 'animal_ear_tag',
+      title: t('butchery.earTag'), dataIndex: 'animal_ear_tag', key: 'animal_ear_tag',
       render: (v: string) => v ? <strong>{v}</strong> : <Text type="secondary">—</Text>,
     },
     {
-      title: 'Hayvan Türü', dataIndex: 'animal_type', key: 'animal_type',
+      title: t('butchery.animalType'), dataIndex: 'animal_type', key: 'animal_type',
       render: (v: string) => {
-        const t = ANIMAL_TYPES.find(a => a.key === v?.toLowerCase() || a.label.toLowerCase().includes(v?.toLowerCase()));
-        return <span>{t?.emoji ?? '🐾'} {v}</span>;
+        const at = ANIMAL_TYPES.find(a => a.key === v?.toLowerCase() || a.label.toLowerCase().includes(v?.toLowerCase()));
+        const label = t(`animals.${v?.toLowerCase()}`) !== `animals.${v?.toLowerCase()}` ? t(`animals.${v?.toLowerCase()}`) : (at?.label || v);
+        return <span>{at?.emoji ?? '🐾'} {label}</span>;
       },
     },
     {
-      title: 'Giriş Karkas', dataIndex: 'input_weight_kg', key: 'input_weight_kg',
+      title: t('butchery.inputWeight'), dataIndex: 'input_weight_kg', key: 'input_weight_kg',
       render: (v: number) => v ? `${Number(v).toFixed(2)} kg` : '-',
     },
     {
-      title: 'Çıkan Parçalar', dataIndex: 'total_output_kg', key: 'total_output_kg',
+      title: t('butchery.totalOutput'), dataIndex: 'total_output_kg', key: 'total_output_kg',
       render: (v: number) => v ? <Tag color="blue">{Number(v).toFixed(2)} kg</Tag> : '-',
     },
     {
-      title: 'Fire / Kayıp', dataIndex: 'waste_kg', key: 'waste_kg',
+      title: t('butchery.wasteLoss'), dataIndex: 'waste_kg', key: 'waste_kg',
       render: (v: number, r: ButcheryRecord) => {
         const rate = (r.input_weight_kg && r.input_weight_kg > 0) ? ((Number(v) / r.input_weight_kg) * 100).toFixed(1) : '0';
         return Number(v) > 0.001
@@ -416,24 +425,24 @@ export default function ButcheryPage() {
       },
     },
     {
-      title: 'Toplam Alış Maliyeti', dataIndex: 'total_cost', key: 'total_cost',
+      title: t('common.totalCost'), dataIndex: 'total_cost', key: 'total_cost',
       render: (v: number, r: ButcheryRecord) => v ? <strong style={{ color: '#f50' }}>{formatMoney(v, (r as any).currency, true)}</strong> : '-',
     },
     {
-      title: 'Dağıtım Anahtarı', dataIndex: 'distribution_method', key: 'distribution_method',
+      title: t('butchery.distMethod'), dataIndex: 'distribution_method', key: 'distribution_method',
       render: (v: string) => v === 'deger'
-        ? <Tag color="purple">💎 Değer Ağırlıklı</Tag>
-        : <Tag color="cyan">⚖️ Miktar Ağırlıklı</Tag>,
+        ? <Tag color="purple">💎 {t('butchery.distValue')}</Tag>
+        : <Tag color="cyan">⚖️ {t('butchery.distWeight')}</Tag>,
     },
     {
-      title: 'Kesim Tarihi', dataIndex: 'operation_date', key: 'operation_date',
+      title: t('common.date'), dataIndex: 'operation_date', key: 'operation_date',
       render: (v: string) => v ? dayjs(v).format('DD.MM.YYYY') : '-',
       sorter: (a: ButcheryRecord, b: ButcheryRecord) => dayjs(a.operation_date).unix() - dayjs(b.operation_date).unix(),
     },
     {
-      title: 'İşlem', key: 'action',
+      title: t('common.actions'), key: 'action',
       render: (_: unknown, r: ButcheryRecord) => (
-        <Button size="small" icon={<EyeOutlined />} onClick={() => viewDetail(r.id)}>Detay</Button>
+        <Button size="small" icon={<EyeOutlined />} onClick={() => viewDetail(r.id)}>{t('common.details')}</Button>
       ),
     },
   ];
@@ -443,22 +452,22 @@ export default function ButcheryPage() {
       {/* ── Başlık & Yeni Buton ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <Title level={3} style={{ margin: 0 }}><ScissorOutlined /> Bütün Kuzu / Hayvan Parçalama & Maliyet Dağıtımı</Title>
+          <Title level={3} style={{ margin: 0 }}><ScissorOutlined /> {t('butchery.title')}</Title>
           <Text type="secondary" style={{ fontSize: 13 }}>
-            Karkas parçalama, ağırlık dengesi, fire kontrolü ve miktar/değer ağırlıklı maliyet dağıtım anahtarı.
+            {t('butchery.subtitle')}
           </Text>
         </div>
         <Space>
-          <Text type="secondary">Tarihe göre filtrele:</Text>
+          <Text type="secondary">{t('butchery.filterByDate')}</Text>
           <DatePicker
             format="DD.MM.YYYY"
-            placeholder="Şu tarihten önce"
+            placeholder={t('butchery.beforeDate')}
             value={filterBefore}
             onChange={v => setFilterBefore(v)}
             allowClear
           />
           <Button type="primary" icon={<PlusOutlined />} onClick={() => { setSelectedType(null); setStep1Open(true); }}>
-            Yeni Parçalama İşlemi
+            {t('butchery.newOperation')}
           </Button>
         </Space>
       </div>
@@ -481,8 +490,8 @@ export default function ButcheryPage() {
         centered
         title={
           <div style={{ textAlign: 'center', paddingTop: 8 }}>
-            <Title level={4} style={{ margin: 0 }}>Parçalanacak Hayvan Türü</Title>
-            <Text type="secondary" style={{ fontSize: 13 }}>Küçükbaş parçalama için Koyun / Kuzu seçiniz</Text>
+            <Title level={4} style={{ margin: 0 }}>{t('butchery.selectAnimalTitle')}</Title>
+            <Text type="secondary" style={{ fontSize: 13 }}>{t('butchery.selectAnimalSubtitle')}</Text>
           </div>
         }
       >
@@ -510,7 +519,7 @@ export default function ButcheryPage() {
                   <CheckCircleFilled style={{ position: 'absolute', top: 8, right: 8, color: '#1890ff', fontSize: 16 }} />
                 )}
                 <div style={{ fontSize: 36, marginBottom: 8 }}>{type.emoji}</div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{type.label}</div>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{t(`animals.${type.key}`) !== `animals.${type.key}` ? t(`animals.${type.key}`) : type.label}</div>
               </div>
             );
           })}
@@ -524,7 +533,7 @@ export default function ButcheryPage() {
           onClick={onTypeConfirm}
           style={{ borderRadius: 8 }}
         >
-          Parçalama ve Maliyet Dağıtımına Başla →
+          {t('butchery.startOperationBtn')}
         </Button>
       </Modal>
 
@@ -538,7 +547,7 @@ export default function ButcheryPage() {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 24 }}>{selectedType?.emoji}</span>
-            <span>{selectedType?.label} Parçalama ve Maliyet Dağıtım Anahtarı</span>
+            <span>{selectedType ? (t(`animals.${selectedType.key}`) !== `animals.${selectedType.key}` ? t(`animals.${selectedType.key}`) : selectedType.label) : ''} {t('butchery.modal2Title')}</span>
           </div>
         }
       >
@@ -551,9 +560,9 @@ export default function ButcheryPage() {
             display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8,
           }}>
             <div>
-              <Text strong style={{ color: '#003eb3' }}>📋 Hızlı Senaryo Doldurucu:</Text>
+              <Text strong style={{ color: '#003eb3' }}>{t('butchery.quickScenario')}</Text>
               <Text style={{ fontSize: 11, display: 'block', color: '#595959' }}>
-                Örnek kuzu parçalama verilerini tek tıkla forma aktarın.
+                {t('butchery.quickScenarioDesc')}
               </Text>
             </div>
             <Space>
@@ -563,7 +572,7 @@ export default function ButcheryPage() {
                 icon={<ThunderboltOutlined />}
                 onClick={fillScenario287}
               >
-                25 kg / 287.50 € (Standart Alış)
+                {t('butchery.scenarioStandard')}
               </Button>
               <Button
                 size="small"
@@ -571,16 +580,16 @@ export default function ButcheryPage() {
                 icon={<ThunderboltOutlined />}
                 onClick={fillScenario351}
               >
-                25 kg / 351.00 € (Ek Masraflı Alış)
+                {t('butchery.scenarioExtraCost')}
               </Button>
             </Space>
           </div>
 
           {/* 1. GİRİŞ BİLGİLERİ KARTI */}
-          <Card size="small" title="1. Giriş Hayvanı ve Satın Alma Maliyeti" style={{ marginBottom: 14, borderRadius: 8 }}>
+          <Card size="small" title={t('butchery.sec1Title')} style={{ marginBottom: 14, borderRadius: 8 }}>
             <Row gutter={[12, 10]}>
               <Col xs={24} sm={8}>
-                <Text style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Küpe / Parti No:</Text>
+                <Text style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>{t('butchery.earTag')}:</Text>
                 <Input
                   placeholder="TR-06-KUZU-001"
                   value={animalEarTag}
@@ -588,7 +597,7 @@ export default function ButcheryPage() {
                 />
               </Col>
               <Col xs={24} sm={8}>
-                <Text style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Giriş Karkas Ağırlığı:</Text>
+                <Text style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>{t('butchery.entryCarcassWeight')}</Text>
                 <InputNumber
                   min={0.1}
                   step={0.5}
@@ -603,7 +612,7 @@ export default function ButcheryPage() {
                 />
               </Col>
               <Col xs={24} sm={8}>
-                <Text style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Toplam Alış Maliyeti:</Text>
+                <Text style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>{t('butchery.totalPurchaseCost')}</Text>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <InputNumber
                     min={0}
@@ -623,13 +632,13 @@ export default function ButcheryPage() {
             </Row>
 
             <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888' }}>
-              <span>Hesaplanan Giriş Birim Fiyatı: <strong>{formatMoney(unitCostInput, currency)} / kg</strong></span>
-              <span>Kesim Tarihi: <DatePicker size="small" value={cutDate} onChange={v => v && setCutDate(v)} /></span>
+              <span>{t('butchery.calcInputUnitPrice')} <strong>{formatMoney(unitCostInput, currency)} / kg</strong></span>
+              <span>{t('butchery.slaughterDate')} <DatePicker size="small" value={cutDate} onChange={v => v && setCutDate(v)} /></span>
             </div>
           </Card>
 
           {/* 2. MALİYET DAĞITIM ANAHTARI SEÇİMİ */}
-          <Card size="small" title="2. Maliyet Dağıtım Anahtarı (Distribution Key)" style={{ marginBottom: 14, borderRadius: 8 }}>
+          <Card size="small" title={t('butchery.sec2Title')} style={{ marginBottom: 14, borderRadius: 8 }}>
             <Radio.Group
               value={distMethod}
               onChange={e => setDistMethod(e.target.value)}
@@ -644,10 +653,10 @@ export default function ButcheryPage() {
                     cursor: 'pointer',
                   }} onClick={() => setDistMethod('agirlik')}>
                     <Radio value="agirlik">
-                      <Text strong>⚖️ Miktar (Ağırlık) Ağırlıklı Dağıtım</Text>
+                      <Text strong>{t('butchery.distWeightTitle')}</Text>
                     </Radio>
                     <Paragraph type="secondary" style={{ fontSize: 11, margin: '4px 0 0 24px' }}>
-                      Toplam maliyet çıkan parçaların kilolarına göre paylaştırılır. Her parçanın birim maliyeti eşit olur (Fire maliyeti sağlam parçalara yüklenir).
+                      {t('butchery.distWeightDesc')}
                     </Paragraph>
                   </div>
                 </Col>
@@ -660,10 +669,10 @@ export default function ButcheryPage() {
                     cursor: 'pointer',
                   }} onClick={() => setDistMethod('deger')}>
                     <Radio value="deger">
-                      <Text strong style={{ color: '#722ed1' }}>💎 Değer (Piyasa Çarpanı) Ağırlıklı Dağıtım</Text>
+                      <Text strong style={{ color: '#722ed1' }}>{t('butchery.distValueTitle')}</Text>
                     </Radio>
                     <Paragraph type="secondary" style={{ fontSize: 11, margin: '4px 0 0 24px' }}>
-                      Pirzola, antrikot gibi değerli etlere piyasa çarpanı uygulanarak daha yüksek maliyet, kemikli/yan ürünlere daha düşük maliyet verilir.
+                      {t('butchery.distValueDesc')}
                     </Paragraph>
                   </div>
                 </Col>
@@ -674,7 +683,7 @@ export default function ButcheryPage() {
           {/* 3. PARÇA AĞIRLIKLARI VE CANLI MALİYET DAĞITIM TABLOSU */}
           <Card
             size="small"
-            title="3. Parça Ürünleri, Fiili Ağırlıklar ve Dağıtılan Maliyetler"
+            title={t('butchery.sec3Title')}
             extra={
               mlLoading ? <Spin size="small" /> : mlResult && (
                 <Tag color={confidenceLabel(mlResult.method, mlResult.sample_count).color === '#52c41a' ? 'green' : 'purple'}>
@@ -688,11 +697,11 @@ export default function ButcheryPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr style={{ background: '#f5f5f5', borderBottom: '1px solid #e8e8e8', textAlign: 'left' }}>
-                    <th style={{ padding: '6px 8px' }}>Parça Adı</th>
-                    {distMethod === 'deger' && <th style={{ padding: '6px 8px' }}>Değer Çarpanı</th>}
-                    <th style={{ padding: '6px 8px', width: 150 }}>Fiili Ağırlık (kg)</th>
-                    <th style={{ padding: '6px 8px', textAlign: 'right' }}>Maliyet Payı</th>
-                    <th style={{ padding: '6px 8px', textAlign: 'right' }}>Birim Maliyet</th>
+                    <th style={{ padding: '6px 8px' }}>{t('butchery.partName')}</th>
+                    {distMethod === 'deger' && <th style={{ padding: '6px 8px' }}>{t('butchery.valueMult')}</th>}
+                    <th style={{ padding: '6px 8px', width: 150 }}>{t('butchery.actualWeight')}</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'right' }}>{t('butchery.costShare')}</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'right' }}>{t('butchery.unitCost')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -703,10 +712,10 @@ export default function ButcheryPage() {
                     return (
                       <tr key={p.part_name} style={{ borderBottom: '1px solid #f0f0f0' }}>
                         <td style={{ padding: '6px 8px' }}>
-                          <Text strong>{p.part_name}</Text>
+                          <Text strong>{getTranslatedPart(p.part_name, t)}</Text>
                           {mlPart && (
                             <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>
-                              AI Beklenti: ~{mlPart.predicted_weight_kg.toFixed(2)} kg (%{(mlPart.expected_ratio * 100).toFixed(0)})
+                              {t('butchery.aiExpectation')} ~{mlPart.predicted_weight_kg.toFixed(2)} kg (%{(mlPart.expected_ratio * 100).toFixed(0)})
                             </Text>
                           )}
                         </td>
@@ -752,21 +761,21 @@ export default function ButcheryPage() {
           }}>
             <Row gutter={[16, 8]}>
               <Col xs={12} sm={6}>
-                <Text type="secondary" style={{ fontSize: 11 }}>Giriş Karkas:</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>{t('butchery.entryCarcass')}</Text>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>{(inputWeightKg || 0).toFixed(2)} kg</div>
               </Col>
               <Col xs={12} sm={6}>
-                <Text type="secondary" style={{ fontSize: 11 }}>Çıkan Parçalar:</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>{t('butchery.outputParts')}</Text>
                 <div style={{ fontWeight: 700, fontSize: 14, color: '#1890ff' }}>{totalOutputKg.toFixed(2)} kg</div>
               </Col>
               <Col xs={12} sm={6}>
-                <Text type="secondary" style={{ fontSize: 11 }}>Parçalama Firesi:</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>{t('butchery.wasteLoss')}:</Text>
                 <div style={{ fontWeight: 700, fontSize: 14, color: wasteKg > 0 ? '#ff4d4f' : '#52c41a' }}>
                   {wasteKg.toFixed(2)} kg (%{fireRate.toFixed(1)})
                 </div>
               </Col>
               <Col xs={12} sm={6}>
-                <Text type="secondary" style={{ fontSize: 11 }}>Toplam Dağıtılan Maliyet:</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>{t('butchery.totalAllocatedCost')}:</Text>
                 <div style={{ fontWeight: 700, fontSize: 14, color: '#52c41a' }}>
                   {formatMoney(totalAllocatedCost, currency)} / {formatMoney(purchaseCost || 0, currency)}
                 </div>
@@ -778,12 +787,12 @@ export default function ButcheryPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 11, color: '#595959' }}>
                 {Math.abs((purchaseCost || 0) - totalAllocatedCost) < 0.01 ? (
-                  <><CheckCircleOutlined style={{ color: '#52c41a' }} /> Toplam dağıtılan tutar alış maliyetine tam eşittir.</>
+                  <><CheckCircleOutlined style={{ color: '#52c41a' }} /> {t('butchery.costBalanced')}</>
                 ) : (
-                  <><WarningOutlined style={{ color: '#faad14' }} /> Dağıtım dengeleniyor...</>
+                  <><WarningOutlined style={{ color: '#faad14' }} /> {t('butchery.costBalancing')}</>
                 )}
               </span>
-              <Tag color="green">Kayıp / Sapma: 0.00 €</Tag>
+              <Tag color="green">{t('butchery.lossDev')}</Tag>
             </div>
           </div>
 
@@ -799,17 +808,17 @@ export default function ButcheryPage() {
                   <Space>
                     <InfoCircleOutlined style={{ color: '#d48806' }} />
                     <Text strong style={{ color: '#d48806', fontSize: 12 }}>
-                      Karkas Alım ve Fire Analizi Bilgilendirme Notu
+                      {t('butchery.infoNoteTitle')}
                     </Text>
                   </Space>
                 ),
                 children: (
                   <div style={{ fontSize: 12, color: '#595959', lineHeight: 1.6 }}>
                     <p>
-                      <strong>1. Fiyat ve Ek Maliyet Analizi:</strong> Karkas alımında <em>25 kg × 11,50 € = 287,50 €</em> yalın et bedelidir; bazı faturalarda mezbaha kesim, nakliye ve veteriner operasyonel giderleri eklenerek toplam fatura tutarı <em>351,00 €</em> olarak yer alabilmektedir (Fark: 63,50 €). Sistemimiz her iki maliyet yöntemini de destekler ve parça maliyetlerini eksiksiz dağıtır.
+                      <strong>{t('butchery.infoNoteP1Title')}</strong> {t('butchery.infoNoteP1Desc')}
                     </p>
                     <p style={{ margin: 0 }}>
-                      <strong>2. Kütle Dengesi ve Fire:</strong> 25 kg karkas giriş ağırlığına karşılık elde edilen net parçalar <em>22 kg</em> etmektedir. Aradaki 3 kg (%12), kesim sırasında kemik tozu, buharlaşma ve temizlikten kaynaklanan <strong>kaçınılmaz parçalama firesidir</strong>. Sistemimiz bu 3 kg'ı fire olarak kaydeder ve maliyet bütünlüğünü tam koruyarak parçalara paylaştırır.
+                      <strong>{t('butchery.infoNoteP2Title')}</strong> {t('butchery.infoNoteP2Desc')}
                     </p>
                   </div>
                 ),
@@ -826,7 +835,7 @@ export default function ButcheryPage() {
             onClick={onSubmit}
             style={{ borderRadius: 8 }}
           >
-            Parçalamayı ve Maliyet Dağıtımını Onayla ({totalOutputKg.toFixed(1)} kg Çıkış · {formatMoney(purchaseCost || 0, currency)})
+            {t('butchery.confirmBtn')} ({totalOutputKg.toFixed(1)} kg {t('common.kg')} · {formatMoney(purchaseCost || 0, currency)})
           </Button>
         </div>
       </Modal>
@@ -843,55 +852,57 @@ export default function ButcheryPage() {
             <span style={{ fontSize: 22 }}>
               {ANIMAL_TYPES.find(a => a.key === detail?.operation.animal_type?.toLowerCase())?.emoji ?? '🐾'}
             </span>
-            <span>Parçalama ve Maliyet Dağıtım Detayı</span>
+            <span>{t('butchery.detailTitle')}</span>
           </div>
         }
       >
         {detail && (
           <div>
             <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
-              <Descriptions.Item label="Küpe / Parti No">
+              <Descriptions.Item label={t('butchery.earTag')}>
                 <strong>{detail.operation.animal_ear_tag || '—'}</strong>
               </Descriptions.Item>
-              <Descriptions.Item label="Hayvan Türü">
-                {detail.operation.animal_type}
+              <Descriptions.Item label={t('butchery.animalType')}>
+                {t(`animals.${detail.operation.animal_type?.toLowerCase()}`) !== `animals.${detail.operation.animal_type?.toLowerCase()}`
+                  ? t(`animals.${detail.operation.animal_type?.toLowerCase()}`)
+                  : detail.operation.animal_type}
               </Descriptions.Item>
-              <Descriptions.Item label="Giriş Karkas">
+              <Descriptions.Item label={t('butchery.entryCarcass')}>
                 {Number(detail.operation.input_weight_kg || detail.operation.total_output_kg).toFixed(2)} kg
               </Descriptions.Item>
-              <Descriptions.Item label="Toplam Çıkış">
+              <Descriptions.Item label={t('butchery.totalOutput')}>
                 <Tag color="blue">{Number(detail.operation.total_output_kg).toFixed(2)} kg</Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="Parçalama Firesi">
+              <Descriptions.Item label={t('butchery.wasteLoss')}>
                 <Tag color={Number(detail.operation.waste_kg) > 0 ? 'volcano' : 'green'}>
                   {Number(detail.operation.waste_kg).toFixed(2)} kg
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="Toplam Alış Maliyeti">
+              <Descriptions.Item label={t('common.totalCost')}>
                 <strong style={{ color: '#f50' }}>{formatMoney(detail.operation.total_cost, (detail.operation as any).currency, true)}</strong>
               </Descriptions.Item>
-              <Descriptions.Item label="Dağıtım Anahtarı" span={2}>
+              <Descriptions.Item label={t('butchery.distMethod')} span={2}>
                 {detail.operation.distribution_method === 'deger'
-                  ? <Tag color="purple">💎 Değer (Piyasa Çarpanı) Ağırlıklı Dağıtım</Tag>
-                  : <Tag color="cyan">⚖️ Miktar (Ağırlık) Ağırlıklı Dağıtım</Tag>}
+                  ? <Tag color="purple">💎 {t('butchery.distValue')}</Tag>
+                  : <Tag color="cyan">⚖️ {t('butchery.distWeight')}</Tag>}
               </Descriptions.Item>
-              <Descriptions.Item label="Kesim Tarihi" span={2}>
+              <Descriptions.Item label={t('butchery.slaughterDate')} span={2}>
                 {dayjs(detail.operation.operation_date).format('DD.MM.YYYY')}
               </Descriptions.Item>
             </Descriptions>
 
-            <Card size="small" title="Üretilen Parça Lotları ve Birim Maliyetleri">
+            <Card size="small" title={t('butchery.producedLotsTitle')}>
               <Table
                 dataSource={detail.parts}
                 rowKey="id"
                 size="small"
                 pagination={false}
                 columns={[
-                  { title: 'Parça Adı', dataIndex: 'part_name', key: 'part_name', render: (v: string) => <strong>{v}</strong> },
-                  { title: 'Lot No', dataIndex: 'lot_number', key: 'lot_number', render: (v: string) => <Tag>{v}</Tag> },
-                  { title: 'Ağırlık', dataIndex: 'actual_weight_kg', key: 'actual_weight_kg', render: (v: number) => `${Number(v).toFixed(2)} kg` },
-                  { title: 'Dağıtılan Maliyet', dataIndex: 'allocated_cost', key: 'allocated_cost', render: (v: number) => <strong style={{ color: '#0958d9' }}>{formatMoney(v, (detail?.operation as any)?.currency)}</strong> },
-                  { title: 'Birim Maliyet', dataIndex: 'unit_cost', key: 'unit_cost', render: (v: number) => <Tag color="cyan">{formatMoney(v, (detail?.operation as any)?.currency)} / kg</Tag> },
+                  { title: t('butchery.partName'), dataIndex: 'part_name', key: 'part_name', render: (v: string) => <strong>{getTranslatedPart(v, t)}</strong> },
+                  { title: t('common.lotNumber'), dataIndex: 'lot_number', key: 'lot_number', render: (v: string) => <Tag>{v}</Tag> },
+                  { title: t('common.quantity'), dataIndex: 'actual_weight_kg', key: 'actual_weight_kg', render: (v: number) => `${Number(v).toFixed(2)} kg` },
+                  { title: t('butchery.costShare'), dataIndex: 'allocated_cost', key: 'allocated_cost', render: (v: number) => <strong style={{ color: '#0958d9' }}>{formatMoney(v, (detail?.operation as any)?.currency)}</strong> },
+                  { title: t('butchery.unitCost'), dataIndex: 'unit_cost', key: 'unit_cost', render: (v: number) => <Tag color="cyan">{formatMoney(v, (detail?.operation as any)?.currency)} / kg</Tag> },
                 ]}
               />
             </Card>

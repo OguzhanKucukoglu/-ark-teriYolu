@@ -11,6 +11,8 @@ import {
 import dayjs from 'dayjs';
 import { rawMaterialService, ocrService } from '../../services/api';
 import { formatMoney, convertToEur, CurrencySelect, EurEquivalentPreview } from '../../utils/currency';
+import { useTranslation } from '../../i18n';
+import { formatUnit, formatDbStatus, formatDbPart } from '../../i18n/formatters';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -56,6 +58,7 @@ interface RawMaterial {
 }
 
 export default function RawMaterialsPage() {
+  const { t } = useTranslation();
   const [materials, setMaterials] = useState<RawMaterial[]>([]);
   const [loading, setLoading]     = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -174,49 +177,49 @@ export default function RawMaterialsPage() {
 
   const columns = [
     {
-      title: 'Hammadde', dataIndex: 'material_type', key: 'material_type',
+      title: t('rawMaterials.materialType'), dataIndex: 'material_type', key: 'material_type',
       render: (v: string) => {
         const found = MATERIALS.find(m => m.label === v);
         const color = found ? CATEGORY_COLORS[found.category] : 'default';
-        return <Tag color={color}>{v}</Tag>;
+        return <Tag color={color}>{formatDbPart(v, t)}</Tag>;
       },
     },
     {
-      title: 'Miktar', key: 'qty',
+      title: t('common.quantity'), key: 'qty',
       render: (_: unknown, r: RawMaterial) =>
-        <Text strong>{Number(r.quantity).toFixed(2)} {r.unit}</Text>,
+        <Text strong>{Number(r.quantity).toFixed(2)} {formatUnit(r.unit, t)}</Text>,
     },
     {
-      title: 'Birim Fiyat', dataIndex: 'unit_price', key: 'unit_price',
+      title: t('common.unitPrice'), dataIndex: 'unit_price', key: 'unit_price',
       render: (v: number, r: RawMaterial) => formatMoney(v, r.currency),
     },
     {
-      title: 'Toplam Değer', dataIndex: 'total_cost', key: 'total_cost',
+      title: t('common.totalCost'), dataIndex: 'total_cost', key: 'total_cost',
       render: (v: number, r: RawMaterial) => <Text strong>{formatMoney(v, r.currency, true)}</Text>,
     },
     {
-      title: 'Lot No', dataIndex: 'lot_number', key: 'lot_number',
+      title: t('common.lotNumber'), dataIndex: 'lot_number', key: 'lot_number',
       render: (v: string) => <Tag color="blue">{v}</Tag>,
     },
     {
-      title: 'Durum', dataIndex: 'lot_status', key: 'lot_status',
+      title: t('common.status'), dataIndex: 'lot_status', key: 'lot_status',
       render: (v: string) => (
         <Tag color={v === 'active' ? 'green' : 'default'}>
-          {v === 'active' ? 'Aktif' : v}
+          {formatDbStatus(v, t)}
         </Tag>
       ),
     },
     {
-      title: 'Eklenme', dataIndex: 'created_at', key: 'created_at',
+      title: t('common.date'), dataIndex: 'created_at', key: 'created_at',
       render: (v: string) => dayjs(v).format('DD.MM.YYYY'),
     },
     {
       title: '', key: 'action',
       render: (_: unknown, r: RawMaterial) => (
         <Popconfirm
-          title="Bu hammaddeyi silmek istiyor musunuz?"
+          title={t('rawMaterials.deleteConfirm')}
           onConfirm={() => onDelete(r.id)}
-          okText="Evet" cancelText="Hayır"
+          okText={t('common.yes')} cancelText={t('common.no')}
         >
           <Button size="small" danger icon={<DeleteOutlined />} />
         </Popconfirm>
@@ -229,7 +232,7 @@ export default function RawMaterialsPage() {
       {/* Başlık */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Title level={3} style={{ margin: 0 }}>
-          <InboxOutlined /> Hammadde Stoğu
+          <InboxOutlined /> {t('rawMaterials.title')}
         </Title>
         <Space>
           <Button
@@ -237,10 +240,10 @@ export default function RawMaterialsPage() {
             style={{ borderColor: '#722ed1', color: '#722ed1', fontWeight: 500 }}
             onClick={openOcrModal}
           >
-            Fatura / İrsaliye Tara (OCR)
+            {t('rawMaterials.scanOcrButton')}
           </Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
-            Hammadde Ekle
+            {t('rawMaterials.addModalTitle')}
           </Button>
         </Space>
       </div>
@@ -249,17 +252,17 @@ export default function RawMaterialsPage() {
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={8}>
           <Card size="small">
-            <Statistic title="Aktif Stok Kalemi" value={activeCount} />
+            <Statistic title={t('rawMaterials.activeStockItem')} value={activeCount} />
           </Card>
         </Col>
         <Col span={8}>
           <Card size="small">
-            <Statistic title="Toplam Stok Değeri" value={totalValue.toFixed(2)} suffix="€" />
+            <Statistic title={t('rawMaterials.totalStockValue')} value={totalValue.toFixed(2)} suffix="€" />
           </Card>
         </Col>
         <Col span={8}>
           <Card size="small">
-            <Statistic title="Toplam Kayıt" value={materials.length} />
+            <Statistic title={t('rawMaterials.totalRecords')} value={materials.length} />
           </Card>
         </Col>
       </Row>
@@ -275,7 +278,7 @@ export default function RawMaterialsPage() {
 
       {/* Ekleme Modalı */}
       <Modal
-        title="Hammadde Ekle"
+        title={t('rawMaterials.addModalTitle')}
         open={modalOpen}
         onCancel={() => { setModalOpen(false); form.resetFields(); }}
         footer={null}
@@ -287,8 +290,8 @@ export default function RawMaterialsPage() {
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <div>
-            <Text strong style={{ color: '#531dab', fontSize: 13 }}>📸 Fatura veya İrsaliyeniz mi var?</Text>
-            <div style={{ fontSize: 11, color: '#722ed1' }}>Yapay zeka ile alanları otomatik doldurun.</div>
+            <Text strong style={{ color: '#531dab', fontSize: 13 }}>📸 {t('rawMaterials.scanOcrButton')}</Text>
+            <div style={{ fontSize: 11, color: '#722ed1' }}>{t('ocr.engineNoticeTitle')}</div>
           </div>
           <Button
             size="small"
@@ -296,16 +299,16 @@ export default function RawMaterialsPage() {
             icon={<ScanOutlined />}
             onClick={() => { setModalOpen(false); openOcrModal(); }}
           >
-            OCR İle Oku
+            {t('rawMaterials.ocrAnalyzeBtn')}
           </Button>
         </div>
 
         <Form form={form} onFinish={onSubmit} layout="vertical" size="large">
 
-          <Form.Item name="material_type" label="Hammadde Türü" rules={[{ required: true, message: 'Hammadde seçin' }]}>
+          <Form.Item name="material_type" label={t('rawMaterials.materialType')} rules={[{ required: true, message: t('rawMaterials.selectMaterial') }]}>
             <Select
               showSearch
-              placeholder="Seçin veya arayın"
+              placeholder={t('rawMaterials.selectOrSearch')}
               onChange={onMaterialChange}
             >
               {/* Kategorilere göre gruplandırılmış */}
@@ -330,7 +333,7 @@ export default function RawMaterialsPage() {
 
           <Row gutter={12}>
             <Col span={14}>
-              <Form.Item name="quantity" label="Miktar" rules={[{ required: true, message: 'Miktar girin' }]}>
+              <Form.Item name="quantity" label={t('common.quantity')} rules={[{ required: true, message: t('rawMaterials.enterQuantity') }]}>
                 <InputNumber
                   min={0.001} step={0.1} precision={3}
                   style={{ width: '100%' }}
@@ -339,7 +342,7 @@ export default function RawMaterialsPage() {
               </Form.Item>
             </Col>
             <Col span={10}>
-              <Form.Item name="unit" label="Birim" rules={[{ required: true }]}>
+              <Form.Item name="unit" label={t('common.unit')} rules={[{ required: true }]}>
                 <Select>
                   <Select.Option value="kg">kg</Select.Option>
                   <Select.Option value="lt">lt</Select.Option>
@@ -351,12 +354,12 @@ export default function RawMaterialsPage() {
             </Col>
           </Row>
 
-          <Form.Item label="Birim Fiyat" required style={{ marginBottom: 16 }}>
+          <Form.Item label={t('common.unitPrice')} required style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', gap: 8 }}>
               <Form.Item
                 name="unit_price"
                 noStyle
-                rules={[{ required: true, message: 'Fiyat girin' }]}
+                rules={[{ required: true, message: t('rawMaterials.enterQuantity') }]}
               >
                 <InputNumber
                   min={0}
@@ -380,17 +383,17 @@ export default function RawMaterialsPage() {
             </Form.Item>
           </Form.Item>
 
-          <Form.Item name="supplier_name" label="Tedarikçi">
-            <Input placeholder="Tedarikçi adı (opsiyonel)" />
+          <Form.Item name="supplier_name" label={t('common.supplier')}>
+            <Input placeholder={t('rawMaterials.supplierPlaceholder')} />
           </Form.Item>
 
-          <Form.Item name="expiry_date" label="Son Kullanma Tarihi">
-            <DatePicker format="DD.MM.YYYY" style={{ width: '100%' }} placeholder="Seçin (opsiyonel)" />
+          <Form.Item name="expiry_date" label={t('common.expiryDate')}>
+            <DatePicker format="DD.MM.YYYY" style={{ width: '100%' }} placeholder={t('rawMaterials.expiryPlaceholder')} />
           </Form.Item>
 
           <Form.Item style={{ marginBottom: 0 }}>
             <Button type="primary" htmlType="submit" block loading={submitting}>
-              Stoğa Ekle
+              {t('rawMaterials.addToStock')}
             </Button>
           </Form.Item>
         </Form>
@@ -401,8 +404,8 @@ export default function RawMaterialsPage() {
         title={
           <Space>
             <ScanOutlined style={{ color: '#722ed1' }} />
-            <span>Fatura & İrsaliye Görselinden Otomatik Okuma (OCR)</span>
-            <Tag color="purple">Akıllı Belge Tanıma</Tag>
+            <span>{t('ocr.modalTitle')}</span>
+            <Tag color="purple">{t('ocr.smartRecognitionTag')}</Tag>
           </Space>
         }
         open={ocrOpen}
@@ -410,7 +413,7 @@ export default function RawMaterialsPage() {
         width={750}
         footer={
           <Space>
-            <Button onClick={() => setOcrOpen(false)}>Vazgeç</Button>
+            <Button onClick={() => setOcrOpen(false)}>{t('ocr.cancel')}</Button>
             <Button
               type="primary"
               style={{ background: '#722ed1', borderColor: '#722ed1' }}
@@ -418,7 +421,7 @@ export default function RawMaterialsPage() {
               disabled={!ocrResult}
               onClick={applyOcrToForm}
             >
-              Bilgileri Hammadde Formuna Aktar
+              {t('ocr.applyToForm')}
             </Button>
           </Space>
         }
@@ -427,14 +430,14 @@ export default function RawMaterialsPage() {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Yapay Zeka Destekli Belge Ayrıştırıcı (OCR Motoru)"
-          description="Satın aldığınız et, baharat, bağırsak veya katkı maddelerine ait sevk irsaliyesi veya faturaları yükleyebilir ya da aşağıdaki hazır belge şablonlarını deneyebilirsiniz."
+          message={t('ocr.engineNoticeTitle')}
+          description={t('ocr.engineNoticeDesc')}
         />
 
         {/* Demo Şablon Seçimi */}
         <div style={{ marginBottom: 16 }}>
           <Text strong style={{ display: 'block', marginBottom: 8 }}>
-            Hazır İrsaliye & Belge Şablonları:
+            {t('ocr.readyTemplates')}
           </Text>
           <Radio.Group
             value={ocrSample}
@@ -445,20 +448,20 @@ export default function RawMaterialsPage() {
             <Row gutter={[8, 8]}>
               <Col span={8}>
                 <Radio.Button value="sample_meat" style={{ width: '100%', textAlign: 'center', height: 'auto', padding: '8px 4px' }}>
-                  <div style={{ fontWeight: 600 }}>🥩 Et İrsaliyesi</div>
-                  <div style={{ fontSize: 11, color: '#888' }}>100 kg Dana But (9.70 €)</div>
+                  <div style={{ fontWeight: 600 }}>{t('ocr.tplMeat')}</div>
+                  <div style={{ fontSize: 11, color: '#888' }}>{t('ocr.tplMeatSub')}</div>
                 </Radio.Button>
               </Col>
               <Col span={8}>
                 <Radio.Button value="sample_spice" style={{ width: '100%', textAlign: 'center', height: 'auto', padding: '8px 4px' }}>
-                  <div style={{ fontWeight: 600 }}>🌶️ Baharat Faturası</div>
-                  <div style={{ fontSize: 11, color: '#888' }}>25 kg Sucuk Baharatı</div>
+                  <div style={{ fontWeight: 600 }}>{t('ocr.tplSpice')}</div>
+                  <div style={{ fontSize: 11, color: '#888' }}>{t('ocr.tplSpiceSub')}</div>
                 </Radio.Button>
               </Col>
               <Col span={8}>
                 <Radio.Button value="sample_casing" style={{ width: '100%', textAlign: 'center', height: 'auto', padding: '8px 4px' }}>
-                  <div style={{ fontWeight: 600 }}>🌭 Bağırsak İrsaliyesi</div>
-                  <div style={{ fontSize: 11, color: '#888' }}>50 kg Doğal Bağırsak</div>
+                  <div style={{ fontWeight: 600 }}>{t('ocr.tplCasing')}</div>
+                  <div style={{ fontSize: 11, color: '#888' }}>{t('ocr.tplCasingSub')}</div>
                 </Radio.Button>
               </Col>
             </Row>
@@ -468,7 +471,7 @@ export default function RawMaterialsPage() {
         {/* OCR Sonuç Kartı */}
         {ocrLoading ? (
           <div style={{ textAlign: 'center', padding: 40 }}>
-            <Spin tip="Belge taranıyor ve yapay zeka ile alanlar ayrıştırılıyor..." />
+            <Spin tip={t('ocr.scanning')} />
           </div>
         ) : ocrResult ? (
           <div>
@@ -480,40 +483,40 @@ export default function RawMaterialsPage() {
               <Space>
                 <ThunderboltOutlined style={{ color: '#722ed1', fontSize: 18 }} />
                 <Text strong style={{ color: '#531dab' }}>
-                  Ayrıştırma Başarılı — Güven Skoru: %{(ocrResult.confidence * 100).toFixed(1)}
+                  {t('ocr.successScore')} %{(ocrResult.confidence * 100).toFixed(1)}
                 </Text>
               </Space>
-              <Tag color="success">Yüksek Doğruluk</Tag>
+              <Tag color="success">{t('ocr.highAccuracy')}</Tag>
             </div>
 
             <Row gutter={16}>
               {/* Sol: Ayrıştırılan Alanlar */}
               <Col span={13}>
-                <Card size="small" title="Ayrıştırılan Form Verileri" style={{ height: '100%' }}>
+                <Card size="small" title={t('ocr.parsedDataCard')} style={{ height: '100%' }}>
                   <Descriptions size="small" bordered column={1}>
-                    <Descriptions.Item label="Tedarikçi Firma">
+                    <Descriptions.Item label={t('ocr.supplierName')}>
                       <Text strong>{ocrResult.supplier_name}</Text>
                     </Descriptions.Item>
-                    <Descriptions.Item label="İrsaliye / Fatura No">
+                    <Descriptions.Item label={t('ocr.invoiceNumber')}>
                       <Tag color="blue">{ocrResult.invoice_number}</Tag>
                     </Descriptions.Item>
-                    <Descriptions.Item label="Malzeme">
+                    <Descriptions.Item label={t('ocr.material')}>
                       <Tag color="volcano">{ocrResult.material_label || ocrResult.material_type}</Tag>
                     </Descriptions.Item>
-                    <Descriptions.Item label="Miktar">
+                    <Descriptions.Item label={t('ocr.quantity')}>
                       <Text strong style={{ color: '#1890ff' }}>{ocrResult.quantity} {ocrResult.unit}</Text>
                     </Descriptions.Item>
-                    <Descriptions.Item label="Birim Fiyat">
+                    <Descriptions.Item label={t('ocr.unitPrice')}>
                       {formatMoney(ocrResult.unit_price, (ocrResult as any).currency || 'EUR')} / {ocrResult.unit}
                     </Descriptions.Item>
-                    <Descriptions.Item label="Toplam Tutar">
+                    <Descriptions.Item label={t('ocr.totalAmount')}>
                       <Text strong style={{ color: '#52c41a' }}>{formatMoney(ocrResult.total_amount, (ocrResult as any).currency || 'EUR', true)}</Text>
                     </Descriptions.Item>
-                    <Descriptions.Item label="Parti / Lot No">
+                    <Descriptions.Item label={t('ocr.lotNumber')}>
                       <Tag color="purple">{ocrResult.lot_number}</Tag>
                     </Descriptions.Item>
                     {ocrResult.expiry_date && (
-                      <Descriptions.Item label="Son Kullanma Tarihi">
+                      <Descriptions.Item label={t('ocr.expiryDate')}>
                         {dayjs(ocrResult.expiry_date).format('DD.MM.YYYY')}
                       </Descriptions.Item>
                     )}
@@ -523,7 +526,7 @@ export default function RawMaterialsPage() {
 
               {/* Sağ: Belgeden Çıkarılan Ham Metin */}
               <Col span={11}>
-                <Card size="small" title="Belgeden Okunan Ham Metin" style={{ height: '100%', background: '#fafafa' }}>
+                <Card size="small" title={t('ocr.rawTextCard')} style={{ height: '100%', background: '#fafafa' }}>
                   <pre style={{
                     fontSize: 11, background: '#262626', color: '#52c41a',
                     padding: 10, borderRadius: 6, maxHeight: 220, overflowY: 'auto',
@@ -532,7 +535,7 @@ export default function RawMaterialsPage() {
                     {ocrResult.detected_text}
                   </pre>
                   <Paragraph type="secondary" style={{ fontSize: 11, marginTop: 8, marginBottom: 0 }}>
-                    💡 Regex & Doğal Dil İşleme kuralları ile metindeki şirket, miktar ve fiyat şablonları çözümlenmiştir.
+                    {t('ocr.nlpNote')}
                   </Paragraph>
                 </Card>
               </Col>

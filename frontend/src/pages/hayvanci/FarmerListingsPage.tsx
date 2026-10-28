@@ -10,6 +10,8 @@ import {
 import dayjs from 'dayjs';
 import { listingService, lotService } from '../../services/api';
 import { formatMoney, convertToEur, CurrencySelect } from '../../utils/currency';
+import { useTranslation } from '../../i18n';
+import { formatUnit, formatDbProduct } from '../../i18n/formatters';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -47,6 +49,7 @@ interface FarmerListing {
 // ── Bileşen ───────────────────────────────────────────────────────────────────
 export default function FarmerListingsPage() {
   const { message } = App.useApp();
+  const { t } = useTranslation();
 
   const [listings, setListings]   = useState<FarmerListing[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -193,10 +196,10 @@ export default function FarmerListingsPage() {
   // ── Tablo ────────────────────────────────────────────────────────────────
   const columns = [
     {
-      title: 'Ürün / Lot', key: 'product',
+      title: `${t('listings.productName')} / ${t('common.lotNumber')}`, key: 'product',
       render: (_: unknown, r: FarmerListing) => (
         <div>
-          <Text strong>{r.product_name}</Text>
+          <Text strong>{formatDbProduct(r.product_name, t)}</Text>
           <div>
             <Tag color="blue" style={{ fontSize: 11 }}>{r.lot_number}</Tag>
           </div>
@@ -204,17 +207,17 @@ export default function FarmerListingsPage() {
       ),
     },
     {
-      title: 'Miktar', key: 'qty',
+      title: t('common.quantity'), key: 'qty',
       render: (_: unknown, r: FarmerListing) => (
-        <Text>{Number(r.quantity).toFixed(2)} {r.unit}</Text>
+        <Text>{Number(r.quantity).toFixed(2)} {formatUnit(r.unit, t)}</Text>
       ),
     },
     {
-      title: 'Birim Fiyat', dataIndex: 'unit_price', key: 'unit_price',
-      render: (v: number, r: FarmerListing) => <Text strong style={{ color: '#f50' }}>{formatMoney(v, r.currency)} / {r.unit}</Text>,
+      title: t('common.unitPrice'), dataIndex: 'unit_price', key: 'unit_price',
+      render: (v: number, r: FarmerListing) => <Text strong style={{ color: '#f50' }}>{formatMoney(v, r.currency)} / {formatUnit(r.unit, t)}</Text>,
     },
     {
-      title: 'Toplam Değer', key: 'total',
+      title: t('common.totalPrice'), key: 'total',
       render: (_: unknown, r: FarmerListing) => (
         <Tag color="green">
           {formatMoney(Number(r.quantity) * Number(r.unit_price), r.currency, true)}
@@ -222,27 +225,27 @@ export default function FarmerListingsPage() {
       ),
     },
     {
-      title: 'Durum', dataIndex: 'is_active', key: 'is_active',
-      render: (v: boolean) => <Tag color={v ? 'green' : 'default'}>{v ? 'Aktif' : 'Pasif'}</Tag>,
+      title: t('common.status'), dataIndex: 'is_active', key: 'is_active',
+      render: (v: boolean) => <Tag color={v ? 'green' : 'default'}>{v ? t('common.active') : t('common.passive')}</Tag>,
     },
     {
-      title: 'Tarih', dataIndex: 'created_at', key: 'created_at',
+      title: t('common.date'), dataIndex: 'created_at', key: 'created_at',
       render: (v: string) => dayjs(v).format('DD.MM.YYYY'),
     },
     {
-      title: 'İşlemler', key: 'actions', width: 180,
+      title: t('common.actions'), key: 'actions', width: 180,
       render: (_: unknown, r: FarmerListing) => (
         <Space>
           <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)}>
-            Düzenle
+            {t('common.edit')}
           </Button>
           <Popconfirm
-            title={r.is_active ? 'İlanı pasife almak istiyor musunuz?' : 'İlanı aktifleştirmek istiyor musunuz?'}
+            title={r.is_active ? t('listings.confirmTogglePassive') : t('listings.confirmToggleActive')}
             onConfirm={() => onToggle(r)}
-            okText="Evet" cancelText="Hayır"
+            okText={t('common.yes')} cancelText={t('common.no')}
           >
             <Button size="small" danger={r.is_active} icon={<PoweroffOutlined />}>
-              {r.is_active ? 'Pasife Al' : 'Aktifleştir'}
+              {r.is_active ? t('common.passive') : t('common.active')}
             </Button>
           </Popconfirm>
         </Space>
@@ -254,14 +257,14 @@ export default function FarmerListingsPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Title level={3} style={{ margin: 0 }}>
-          <TagsOutlined /> Market İlanlarım
+          <TagsOutlined /> {t('listings.title')}
         </Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => {
           setSelectedLot(null);
           form.resetFields();
           setCreateOpen(true);
         }}>
-          Yeni İlan Ver
+          {t('listings.createListing')}
         </Button>
       </div>
 
@@ -269,19 +272,19 @@ export default function FarmerListingsPage() {
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={8}>
           <Card size="small">
-            <Statistic title="Aktif İlan" value={aktif}
+            <Statistic title={t('listings.activeListings')} value={aktif}
               valueStyle={{ color: aktif > 0 ? '#52c41a' : undefined }} />
           </Card>
         </Col>
         <Col span={8}>
           <Card size="small">
-            <Statistic title="Pasif İlan" value={pasif}
+            <Statistic title={t('listings.passiveListings')} value={pasif}
               valueStyle={{ color: pasif > 0 ? '#8c8c8c' : undefined }} />
           </Card>
         </Col>
         <Col span={8}>
           <Card size="small">
-            <Statistic title="Aktif Stok Değeri" value={toplamDeger.toFixed(2)} suffix="€"
+            <Statistic title={t('listings.totalValue')} value={toplamDeger.toFixed(2)} suffix="€"
               valueStyle={{ color: '#f50' }} />
           </Card>
         </Col>
@@ -305,18 +308,18 @@ export default function FarmerListingsPage() {
         onCancel={() => setCreateOpen(false)}
         footer={null}
         width={520}
-        title={<><PlusOutlined /> Yeni Market İlanı</>}
+        title={<><PlusOutlined /> {t('listings.newMarketListing')}</>}
       >
         <Form form={form} onFinish={onCreateSubmit} layout="vertical">
 
           {/* Lot seçimi */}
           <Form.Item
-            name="lot_id" label="Lot Seçin"
-            rules={[{ required: true, message: 'Lot seçin' }]}
+            name="lot_id" label={t('listings.selectLot')}
+            rules={[{ required: true, message: t('listings.selectLot') }]}
           >
             <Select
               showSearch
-              placeholder="Aktif parça veya mamul lotlarınız"
+              placeholder={t('listings.selectLotPlaceholder')}
               onChange={onLotSelect}
               optionFilterProp="label"
               options={availableLots.map(l => ({
@@ -326,7 +329,7 @@ export default function FarmerListingsPage() {
               notFoundContent={
                 <div style={{ padding: 8, textAlign: 'center' }}>
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    İlan verilebilecek aktif lot yok
+                    {t('common.noData')}
                   </Text>
                 </div>
               }
@@ -341,16 +344,16 @@ export default function FarmerListingsPage() {
             }}>
               <Row gutter={16}>
                 <Col span={12}>
-                  <Text type="secondary" style={{ fontSize: 11 }}>Lot No</Text>
+                  <Text type="secondary" style={{ fontSize: 11 }}>{t('common.lotNumber')}</Text>
                   <div><Tag color="blue">{selectedLot.lot_number}</Tag></div>
                 </Col>
                 <Col span={12}>
-                  <Text type="secondary" style={{ fontSize: 11 }}>Mevcut Miktar</Text>
+                  <Text type="secondary" style={{ fontSize: 11 }}>{t('market.inStock')}</Text>
                   <div><Text strong>{Number(selectedLot.quantity).toFixed(2)} {selectedLot.unit}</Text></div>
                 </Col>
                 {selectedLot.unit_cost > 0 && (
                   <Col span={12} style={{ marginTop: 8 }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>EKP (Birim Maliyet)</Text>
+                    <Text type="secondary" style={{ fontSize: 11 }}>{t('production.ekp')}</Text>
                     <div><Text>{Number(selectedLot.unit_cost).toFixed(4)} €/{selectedLot.unit}</Text></div>
                   </Col>
                 )}
@@ -359,38 +362,38 @@ export default function FarmerListingsPage() {
           )}
 
           <Form.Item
-            name="product_name" label="Ürün Adı"
-            rules={[{ required: true, message: 'Ürün adı girin' }]}
+            name="product_name" label={t('listings.productName')}
+            rules={[{ required: true, message: t('listings.productName') }]}
           >
-            <Input placeholder="örn. Dana Kol Eti, Sucuk vb." />
+            <Input placeholder={t('listings.productNamePlaceholder')} />
           </Form.Item>
 
           <Row gutter={12}>
             <Col span={10}>
               <Form.Item
-                name="quantity" label="Satış Miktarı"
-                rules={[{ required: true, message: 'Miktar girin' }]}
+                name="quantity" label={t('listings.quantity')}
+                rules={[{ required: true, message: t('rawMaterials.enterQuantity') }]}
               >
                 <InputNumber min={0.001} step={0.1} precision={3} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item name="unit" label="Birim" rules={[{ required: true }]}>
+              <Form.Item name="unit" label={t('common.unit')} rules={[{ required: true }]}>
                 <Select>
                   <Select.Option value="kg">kg</Select.Option>
-                  <Select.Option value="paket">paket</Select.Option>
+                  <Select.Option value="paket">{t('production.packageUnit')}</Select.Option>
                   <Select.Option value="adet">adet</Select.Option>
                   <Select.Option value="lt">lt</Select.Option>
                 </Select>
               </Form.Item>
             </Col>
             <Col span={10}>
-              <Form.Item label="Birim Fiyat" required>
+              <Form.Item label={t('common.unitPrice')} required>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <Form.Item
                     name="unit_price"
                     noStyle
-                    rules={[{ required: true, message: 'Fiyat girin' }]}
+                    rules={[{ required: true, message: t('common.unitPrice') }]}
                   >
                     <InputNumber min={0} step={0.01} precision={2} style={{ flex: 1 }} placeholder="0.00" />
                   </Form.Item>
@@ -417,7 +420,7 @@ export default function FarmerListingsPage() {
                   border: '1px solid #b7eb8f', marginBottom: 16,
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                 }}>
-                  <Text type="secondary">Toplam Değer</Text>
+                  <Text type="secondary">{t('listings.totalValue')}</Text>
                   <Text strong style={{ color: '#52c41a', fontSize: 16 }}>
                     {formatMoney(total, cur, true)}
                   </Text>
@@ -426,13 +429,13 @@ export default function FarmerListingsPage() {
             }}
           </Form.Item>
 
-          <Form.Item name="description" label="Açıklama (opsiyonel)">
-            <TextArea rows={2} placeholder="Ürün hakkında ek bilgi..." />
+          <Form.Item name="description" label={`${t('common.description')} (${t('common.optional')})`}>
+            <TextArea rows={2} placeholder={t('listings.descPlaceholder')} />
           </Form.Item>
 
           <Divider style={{ margin: '8px 0 16px' }} />
           <Button type="primary" htmlType="submit" block size="large" loading={creating}>
-            İlanı Yayınla
+            {t('listings.publish')}
           </Button>
         </Form>
       </Modal>
@@ -443,7 +446,7 @@ export default function FarmerListingsPage() {
         onCancel={() => setEditOpen(false)}
         footer={null}
         width={420}
-        title={<><EditOutlined /> İlan Düzenle — {editListing?.product_name}</>}
+        title={<><EditOutlined /> {t('listings.editListing')} — {editListing?.product_name}</>}
       >
         <Form form={editForm} onFinish={onEditSubmit} layout="vertical">
 
@@ -462,20 +465,20 @@ export default function FarmerListingsPage() {
           <Row gutter={12}>
             <Col span={10}>
               <Form.Item
-                name="quantity" label="Satış Miktarı"
-                rules={[{ required: true, message: 'Miktar girin' }]}
+                name="quantity" label={t('listings.quantity')}
+                rules={[{ required: true, message: t('rawMaterials.enterQuantity') }]}
               >
                 <InputNumber min={0.001} step={0.1} precision={3}
                   style={{ width: '100%' }} addonAfter={editListing?.unit} />
               </Form.Item>
             </Col>
             <Col span={14}>
-              <Form.Item label="Birim Fiyat" required>
+              <Form.Item label={t('common.unitPrice')} required>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <Form.Item
                     name="unit_price"
                     noStyle
-                    rules={[{ required: true, message: 'Fiyat girin' }]}
+                    rules={[{ required: true, message: t('common.unitPrice') }]}
                   >
                     <InputNumber min={0} step={0.01} precision={2}
                       style={{ flex: 1 }} placeholder="0.00" />
@@ -503,7 +506,7 @@ export default function FarmerListingsPage() {
                   border: '1px solid #b7eb8f', marginBottom: 16,
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                 }}>
-                  <Text type="secondary">Toplam Değer</Text>
+                  <Text type="secondary">{t('listings.totalValue')}</Text>
                   <Text strong style={{ color: '#52c41a' }}>
                     {formatMoney(total, cur, true)}
                   </Text>
@@ -512,12 +515,12 @@ export default function FarmerListingsPage() {
             }}
           </Form.Item>
 
-          <Form.Item name="description" label="Açıklama (opsiyonel)">
+          <Form.Item name="description" label={`${t('common.description')} (${t('common.optional')})`}>
             <TextArea rows={2} />
           </Form.Item>
 
           <Button type="primary" htmlType="submit" block loading={editSubmitting}>
-            Değişiklikleri Kaydet
+            {t('common.save')}
           </Button>
         </Form>
       </Modal>

@@ -8,6 +8,7 @@ import {
   EditOutlined, PoweroffOutlined,
 } from '@ant-design/icons';
 import { listingService } from '../../services/api';
+import { useTranslation } from '../../i18n';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -100,6 +101,7 @@ interface Listing {
 }
 
 export default function ProducerListingsManagePage() {
+  const { t } = useTranslation();
   const { message } = App.useApp();
   const [listings, setListings]         = useState<Listing[]>([]);
   const [loading, setLoading]           = useState(true);
@@ -270,34 +272,34 @@ export default function ProducerListingsManagePage() {
 
   const columns = [
     {
-      title: 'Ürün', dataIndex: 'product_name', key: 'product_name',
+      title: t('production.productName'), dataIndex: 'product_name', key: 'product_name',
       render: (v: string) => {
         const p = PRODUCTS.find(p => p.label === v);
         return <Text strong>{p?.emoji} {v}</Text>;
       },
     },
     {
-      title: 'Açıklama', dataIndex: 'description', key: 'description',
+      title: t('common.description'), dataIndex: 'description', key: 'description',
       render: (v: string) => v || '—',
     },
     {
-      title: 'Hizmet Fiyatı', dataIndex: 'service_price', key: 'service_price',
+      title: t('production.serviceCost'), dataIndex: 'service_price', key: 'service_price',
       render: (v: number) => `${Number(v).toFixed(2)} € / kg`,
     },
     {
-      title: 'Min. Sipariş', dataIndex: 'min_order_qty', key: 'min_order_qty',
+      title: t('producerListings.minOrder'), dataIndex: 'min_order_qty', key: 'min_order_qty',
       render: (v: number) => v ? `${v} kg` : '—',
     },
     {
-      title: 'Durum', dataIndex: 'is_active', key: 'is_active',
-      render: (v: boolean) => <Tag color={v ? 'green' : 'default'}>{v ? 'Aktif' : 'Pasif'}</Tag>,
+      title: t('common.status'), dataIndex: 'is_active', key: 'is_active',
+      render: (v: boolean) => <Tag color={v ? 'green' : 'default'}>{v ? t('common.active') : t('common.passive')}</Tag>,
     },
     {
-      title: 'Tarih', dataIndex: 'created_at', key: 'created_at',
-      render: (v: string) => new Date(v).toLocaleDateString('tr-TR'),
+      title: t('common.date'), dataIndex: 'created_at', key: 'created_at',
+      render: (v: string) => new Date(v).toLocaleDateString(),
     },
     {
-      title: 'İşlemler', key: 'actions', width: 200,
+      title: t('common.actions'), key: 'actions', width: 200,
       render: (_: unknown, r: Listing) => (
         <Space>
           <Button
@@ -305,20 +307,20 @@ export default function ProducerListingsManagePage() {
             icon={<EditOutlined />}
             onClick={() => openEdit(r)}
           >
-            Düzenle
+            {t('common.edit')}
           </Button>
           <Popconfirm
-            title={r.is_active ? 'İlanı pasife almak istiyor musunuz?' : 'İlanı aktifleştirmek istiyor musunuz?'}
+            title={r.is_active ? t('listings.confirmTogglePassive') : t('listings.confirmToggleActive')}
             onConfirm={() => onToggle(r)}
-            okText="Evet"
-            cancelText="Hayır"
+            okText={t('common.yes')}
+            cancelText={t('common.no')}
           >
             <Button
               size="small"
               danger={!!r.is_active}
               icon={<PoweroffOutlined />}
             >
-              {r.is_active ? 'Pasife Al' : 'Aktifleştir'}
+              {r.is_active ? t('common.passive') : t('common.active')}
             </Button>
           </Popconfirm>
         </Space>
@@ -330,10 +332,10 @@ export default function ProducerListingsManagePage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Title level={3} style={{ margin: 0 }}>
-          <TagsOutlined /> İlanlarım
+          <TagsOutlined /> {t('producerListings.manageTitle')}
         </Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => { setSelected(null); setStep1Open(true); }}>
-          Yeni İlan Ver
+          {t('listings.createListing')}
         </Button>
       </div>
 
@@ -348,8 +350,7 @@ export default function ProducerListingsManagePage() {
         centered
         title={
           <div style={{ textAlign: 'center', paddingTop: 8 }}>
-            <Title level={4} style={{ margin: 0 }}>Ürün Seçin</Title>
-            <Text type="secondary" style={{ fontSize: 13 }}>Hangi ürünü üretmek istiyorsunuz?</Text>
+            <Title level={4} style={{ margin: 0 }}>{t('producerListings.selectProduct')}</Title>
           </div>
         }
       >
@@ -416,14 +417,14 @@ export default function ProducerListingsManagePage() {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 22 }}>{selectedProduct?.emoji}</span>
-            <span>{selectedProduct?.label} — İlan Detayları</span>
+            <span>{selectedProduct?.label} — {t('producerListings.step2Title')}</span>
           </div>
         }
       >
         <Form form={form} onFinish={onSubmit} layout="vertical">
 
           <Divider orientation="left" style={{ fontSize: 13, color: '#666', marginTop: 0 }}>
-            Hammadde Miktarları (1 birim üretim için)
+            {t('producerListings.rawMaterialsForUnit')}
           </Divider>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
@@ -446,32 +447,32 @@ export default function ProducerListingsManagePage() {
           </div>
 
           <Divider orientation="left" style={{ fontSize: 13, color: '#666' }}>
-            Fiyat ve Kapasite
+            {t('producerListings.priceAndCapacity')}
           </Divider>
 
           <Row gutter={12}>
             <Col span={12}>
               <Form.Item
-                name="service_price" label="Hizmet Fiyatı (€/kg)"
-                rules={[{ required: true, message: 'Fiyat girin' }]}
+                name="service_price" label={`${t('producerListings.serviceCost')} (€/kg)`}
+                rules={[{ required: true, message: t('producerListings.priceRequired') }]}
               >
                 <InputNumber min={0} step={0.01} precision={2} style={{ width: '100%' }} addonAfter="€/kg" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="min_order_qty" label="Min. Sipariş (kg)">
+              <Form.Item name="min_order_qty" label={`${t('producerListings.minOrder')} (kg)`}>
                 <InputNumber min={0} step={1} precision={0} style={{ width: '100%' }} addonAfter="kg" />
               </Form.Item>
             </Col>
           </Row>
 
-          <Form.Item name="description" label="Açıklama">
-            <TextArea rows={2} placeholder="Ürün hakkında ek bilgi (opsiyonel)" />
+          <Form.Item name="description" label={t('common.description')}>
+            <TextArea rows={2} placeholder={t('producerListings.descPlaceholder')} />
           </Form.Item>
 
           <Form.Item style={{ marginBottom: 0 }}>
             <Button type="primary" htmlType="submit" block size="large" loading={submitting} style={{ borderRadius: 8 }}>
-              İlanı Yayınla
+              {t('producerListings.publishListing')}
             </Button>
           </Form.Item>
         </Form>
@@ -487,14 +488,14 @@ export default function ProducerListingsManagePage() {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 22 }}>{editProduct?.emoji ?? '📦'}</span>
-            <span>{editingListing?.product_name} — İlanı Düzenle</span>
+            <span>{editingListing?.product_name} — {t('listings.editListing')}</span>
           </div>
         }
       >
         <Form form={editForm} onFinish={onEditSubmit} layout="vertical">
 
           <Divider orientation="left" style={{ fontSize: 13, color: '#666', marginTop: 0 }}>
-            Hammadde Miktarları (1 birim üretim için)
+            {t('producerListings.rawMaterialsForUnit')}
           </Divider>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
@@ -517,32 +518,32 @@ export default function ProducerListingsManagePage() {
           </div>
 
           <Divider orientation="left" style={{ fontSize: 13, color: '#666' }}>
-            Fiyat ve Kapasite
+            {t('producerListings.priceAndCapacity')}
           </Divider>
 
           <Row gutter={12}>
             <Col span={12}>
               <Form.Item
-                name="service_price" label="Hizmet Fiyatı (€/kg)"
-                rules={[{ required: true, message: 'Fiyat girin' }]}
+                name="service_price" label={`${t('producerListings.serviceCost')} (€/kg)`}
+                rules={[{ required: true, message: t('producerListings.priceRequired') }]}
               >
                 <InputNumber min={0} step={0.01} precision={2} style={{ width: '100%' }} addonAfter="€/kg" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="min_order_qty" label="Min. Sipariş (kg)">
+              <Form.Item name="min_order_qty" label={`${t('producerListings.minOrder')} (kg)`}>
                 <InputNumber min={0} step={1} precision={0} style={{ width: '100%' }} addonAfter="kg" />
               </Form.Item>
             </Col>
           </Row>
 
-          <Form.Item name="description" label="Açıklama">
-            <TextArea rows={2} placeholder="Ürün hakkında ek bilgi (opsiyonel)" />
+          <Form.Item name="description" label={t('common.description')}>
+            <TextArea rows={2} placeholder={t('producerListings.descPlaceholder')} />
           </Form.Item>
 
           <Form.Item style={{ marginBottom: 0 }}>
             <Button type="primary" htmlType="submit" block size="large" loading={editSubmitting} style={{ borderRadius: 8 }}>
-              Değişiklikleri Kaydet
+              {t('common.save')}
             </Button>
           </Form.Item>
         </Form>

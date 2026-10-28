@@ -20,10 +20,13 @@ import { invoiceService } from '../../services/api';
 import { Invoice } from '../../types';
 import { InvoiceModal } from '../../components/InvoiceModal';
 import { useAuthStore } from '../../store/authStore';
+import { useTranslation } from '../../i18n';
+import { formatUnit } from '../../i18n/formatters';
 
 const { Title, Text } = Typography;
 
 export const InvoicesPage: React.FC = () => {
+  const { t } = useTranslation();
   const { user } = useAuthStore();
   const isHayvanci = user?.role === 'hayvanci';
   const isSucukcu  = user?.role === 'sucukcu';
@@ -42,7 +45,7 @@ export const InvoicesPage: React.FC = () => {
       const res = await invoiceService.getAll(params);
       setInvoices(res.data);
     } catch {
-      message.error('Faturalar yüklenirken hata oluştu');
+      message.error(t('invoices.loadError'));
     } finally {
       setLoading(false);
     }
@@ -59,7 +62,7 @@ export const InvoicesPage: React.FC = () => {
 
   const columns = [
     {
-      title: 'Fatura No',
+      title: t('invoices.invoiceNumber'),
       dataIndex: 'invoice_number',
       key: 'invoice_number',
       render: (text: string, record: Invoice) => (
@@ -71,67 +74,67 @@ export const InvoicesPage: React.FC = () => {
             {text}
           </a>
           <Text type="secondary" style={{ fontSize: 11 }}>
-            {new Date(record.invoice_date).toLocaleDateString('tr-TR')}
+            {new Date(record.invoice_date).toLocaleDateString()}
           </Text>
         </Space>
       ),
     },
     {
-      title: 'Fatura Türü',
+      title: t('invoices.invoiceType'),
       dataIndex: 'invoice_type',
       key: 'invoice_type',
       render: (type: 'hizmet' | 'satis') => {
         if (type === 'hizmet') {
           return (
             <Tag icon={<ToolOutlined />} color="purple">
-              {isHayvanci ? 'Fason Hizmet (Üretici ➔ İşletme)' : 'Fason Hizmet Faturası'}
+              {t('invoices.serviceInvoice')}
             </Tag>
           );
         }
         return (
           <Tag icon={<ShopOutlined />} color="green">
-            {isHayvanci ? 'Satış Faturası (İşletme ➔ Market)' : 'Satış Faturası'}
+            {t('invoices.salesInvoice')}
           </Tag>
         );
       },
     },
     {
-      title: 'Düzenleyen (Satıcı/Hizmet)',
+      title: t('invoices.sender'),
       key: 'sender',
       render: (_: unknown, record: Invoice) => (
         <div>
           <Text strong>{record.sender_name}</Text>
-          {record.sender_id === user?.id && <Tag color="blue" style={{ marginLeft: 6 }}>Ben</Tag>}
+          {record.sender_id === user?.id && <Tag color="blue" style={{ marginLeft: 6 }}>{t('common.me')}</Tag>}
           <div style={{ fontSize: 11, color: '#64748b' }}>{record.sender_email}</div>
         </div>
       ),
     },
     {
-      title: 'Alıcı (Müşteri)',
+      title: t('invoices.receiver'),
       key: 'receiver',
       render: (_: unknown, record: Invoice) => (
         <div>
           <Text strong>{record.receiver_name}</Text>
-          {record.receiver_id === user?.id && <Tag color="cyan" style={{ marginLeft: 6 }}>Ben</Tag>}
+          {record.receiver_id === user?.id && <Tag color="cyan" style={{ marginLeft: 6 }}>{t('common.me')}</Tag>}
           <div style={{ fontSize: 11, color: '#64748b' }}>{record.receiver_email}</div>
         </div>
       ),
     },
     {
-      title: 'Lot No',
+      title: t('common.lotNumber'),
       dataIndex: 'lot_number',
       key: 'lot_number',
       render: (lot: string) => (lot ? <Tag color="blue">{lot}</Tag> : '-'),
     },
     {
-      title: 'Miktar',
+      title: t('common.quantity'),
       key: 'quantity',
       align: 'right' as const,
       render: (_: unknown, record: Invoice) =>
-        `${Number(record.quantity).toLocaleString('tr-TR')} ${record.unit}`,
+        `${Number(record.quantity).toLocaleString()} ${formatUnit(record.unit, t)}`,
     },
     {
-      title: 'Toplam Tutar',
+      title: t('common.totalPrice'),
       dataIndex: 'total_amount',
       key: 'total_amount',
       align: 'right' as const,
@@ -142,15 +145,15 @@ export const InvoicesPage: React.FC = () => {
       ),
     },
     {
-      title: 'Durum',
+      title: t('common.status'),
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => (
-        <Badge status={status === 'odendi' ? 'success' : 'default'} text={status.toUpperCase()} />
+        <Badge status={status === 'odendi' ? 'success' : 'default'} text={status === 'odendi' ? t('invoices.paid') : status.toUpperCase()} />
       ),
     },
     {
-      title: 'İşlem',
+      title: t('common.actions'),
       key: 'action',
       render: (_: unknown, record: Invoice) => (
         <Space>
@@ -160,7 +163,7 @@ export const InvoicesPage: React.FC = () => {
             icon={<EyeOutlined />}
             onClick={() => handleOpenInvoice(record)}
           >
-            Faturayı Gör / İndir
+            {t('invoices.printPdf')}
           </Button>
         </Space>
       ),
@@ -176,32 +179,32 @@ export const InvoicesPage: React.FC = () => {
       <div style={{ marginBottom: 20 }}>
         <Title level={3} style={{ margin: 0 }}>
           <FileTextOutlined style={{ marginRight: 8, color: '#2563eb' }} />
-          Faturalar & Belgeler
+          {t('invoices.title')}
         </Title>
         <Text type="secondary">
           {isMarket
-            ? 'İşletmeden satın aldığınız ürünlere ait faturaları görüntüleyin ve PDF olarak indirin.'
+            ? t('invoices.subtitleMarket')
             : isSucukcu
-            ? 'İşletmeye verdiğiniz fason üretim ve işçilik hizmet faturalarını görüntüleyin ve PDF olarak indirin.'
-            : 'Sistemde tarafı olduğunuz tüm Fason İşçilik/Hizmet ve Mamul Satış faturalarını görüntüleyin ve PDF olarak indirin.'}
+            ? t('invoices.subtitleProducer')
+            : t('invoices.subtitleEnterprise')}
         </Text>
       </div>
 
       {/* Summary KPI row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 20 }}>
         <Card size="small" style={{ borderRadius: 8 }}>
-          <Text type="secondary">Toplam Belge Sayısı</Text>
+          <Text type="secondary">{t('invoices.totalDocs')}</Text>
           <div style={{ fontSize: 22, fontWeight: 700, color: '#1e3a8a', marginTop: 4 }}>
-            {invoices.length} Adet
+            {invoices.length} {t('units.piece')}
           </div>
         </Card>
 
         {/* Fason Hizmet sadece İşletme ve Üretici için gösterilir */}
         {!isMarket && (
           <Card size="small" style={{ borderRadius: 8 }}>
-            <Text type="secondary">Fason Hizmet Faturaları</Text>
+            <Text type="secondary">{t('invoices.serviceInvoices')}</Text>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#7c3aed', marginTop: 4 }}>
-              {hizmetCount} Adet
+              {hizmetCount} {t('units.piece')}
             </div>
           </Card>
         )}
@@ -209,15 +212,15 @@ export const InvoicesPage: React.FC = () => {
         {/* Satış Faturaları sadece İşletme ve Market için gösterilir */}
         {!isSucukcu && (
           <Card size="small" style={{ borderRadius: 8 }}>
-            <Text type="secondary">{isMarket ? 'Satın Alma Faturaları' : 'Toptan Satış Faturaları'}</Text>
+            <Text type="secondary">{isMarket ? t('invoices.purchaseInvoices') : t('invoices.salesInvoices')}</Text>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#16a34a', marginTop: 4 }}>
-              {satisCount} Adet
+              {satisCount} {t('units.piece')}
             </div>
           </Card>
         )}
 
         <Card size="small" style={{ borderRadius: 8 }}>
-          <Text type="secondary">Toplam İşlem Hacmi</Text>
+          <Text type="secondary">{t('invoices.totalVolume')}</Text>
           <div style={{ fontSize: 22, fontWeight: 700, color: '#2563eb', marginTop: 4 }}>
             {totalAmountSum.toFixed(2)} €
           </div>
@@ -228,16 +231,16 @@ export const InvoicesPage: React.FC = () => {
         style={{ borderRadius: 8 }}
         title={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-            <span>Fatura Kayıtları</span>
+            <span>{t('invoices.recordsTitle')}</span>
             {isHayvanci && (
               <Radio.Group
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
                 buttonStyle="solid"
               >
-                <Radio.Button value="all">Tüm Faturalar</Radio.Button>
-                <Radio.Button value="hizmet">Fason Hizmet (Üretici ➔ İşletme)</Radio.Button>
-                <Radio.Button value="satis">Satış (İşletme ➔ Market)</Radio.Button>
+                <Radio.Button value="all">{t('invoices.allInvoices')}</Radio.Button>
+                <Radio.Button value="hizmet">{t('invoices.filterHizmet')}</Radio.Button>
+                <Radio.Button value="satis">{t('invoices.filterSatis')}</Radio.Button>
               </Radio.Group>
             )}
           </div>

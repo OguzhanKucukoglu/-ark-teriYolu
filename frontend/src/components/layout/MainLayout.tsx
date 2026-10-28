@@ -10,6 +10,7 @@ import {
 import dayjs from 'dayjs';
 import { useAuthStore } from '../../store/authStore';
 import { notificationService } from '../../services/api';
+import { useTranslation, LanguageSwitcher } from '../../i18n';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -26,12 +27,6 @@ interface NotificationItem {
   created_at: string;
 }
 
-const roleLabels: Record<string, string> = {
-  hayvanci: 'İşletme',
-  sucukcu:  'Üretici',
-  market:   'Market',
-};
-
 const roleColors: Record<string, string> = {
   hayvanci: '#52c41a',
   sucukcu:  '#1890ff',
@@ -40,6 +35,7 @@ const roleColors: Record<string, string> = {
 
 export default function MainLayout() {
   const { user, logout } = useAuthStore();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -83,21 +79,21 @@ export default function MainLayout() {
     }
   }
 
-  const menuItems = getMenuItems(user?.role || '');
+  const menuItems = getMenuItems(user?.role || '', t);
 
   const userMenu = [
-    { key: 'logout', icon: <LogoutOutlined />, label: 'Çıkış Yap', onClick: () => { logout(); navigate('/login'); } },
+    { key: 'logout', icon: <LogoutOutlined />, label: t('nav.logout'), onClick: () => { logout(); navigate('/login'); } },
   ];
 
   const notificationContent = (
     <div style={{ width: 360, maxHeight: 420, display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid #f0f0f0' }}>
         <Text strong style={{ fontSize: 14 }}>
-          Bildirimler {unreadCount > 0 && <Tag color="red">{unreadCount} yeni</Tag>}
+          {t('nav.notifications')} {unreadCount > 0 && <Tag color="red">{unreadCount} {t('nav.newNotifications')}</Tag>}
         </Text>
         {unreadCount > 0 && (
           <Button type="link" size="small" onClick={handleMarkAllRead} style={{ padding: 0 }}>
-            Tümünü okundu yap
+            {t('nav.markAllRead')}
           </Button>
         )}
       </div>
@@ -105,7 +101,7 @@ export default function MainLayout() {
       <div style={{ overflowY: 'auto', flex: 1 }}>
         {notifications.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '24px 0', color: '#8c8c8c' }}>
-            Henüz bildiriminiz yok
+            {t('notifications.noNotifications')}
           </div>
         ) : (
           <List
@@ -145,7 +141,7 @@ export default function MainLayout() {
                         <Text strong style={{ fontSize: 13, color: isQualityIssue ? '#cf1322' : undefined }}>
                           {item.title}
                         </Text>
-                        {isUnread && <Tag color={isQualityIssue ? 'error' : 'processing'} style={{ fontSize: 10, lineHeight: '16px' }}>Yeni</Tag>}
+                        {isUnread && <Tag color={isQualityIssue ? 'error' : 'processing'} style={{ fontSize: 10, lineHeight: '16px' }}>{t('notifications.new')}</Tag>}
                       </div>
 
                       <Text style={{ fontSize: 12, display: 'block', margin: '4px 0', color: '#595959' }}>
@@ -170,7 +166,7 @@ export default function MainLayout() {
                                   navigate(`/lots/${item.reference_id}/trace`);
                                 }}
                               >
-                                İleri İzle
+                                {t('lots.traceForward')}
                               </Button>
                             )}
                             <Button
@@ -184,7 +180,7 @@ export default function MainLayout() {
                                 navigate('/recalls');
                               }}
                             >
-                              Geri Çağır
+                              {t('recalls.startRecall')}
                             </Button>
                           </Space>
                         )}
@@ -207,7 +203,7 @@ export default function MainLayout() {
           <Text strong style={{ color: '#fff', fontSize: 18 }}>🐄 AVATAR</Text>
           <br />
           <Text style={{ color: roleColors[user?.role || ''], fontSize: 12 }}>
-            {roleLabels[user?.role || '']}
+            {t(`roles.${user?.role || 'hayvanci'}`)}
           </Text>
         </div>
         <Menu
@@ -221,6 +217,7 @@ export default function MainLayout() {
       <Layout>
         <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', boxShadow: '0 1px 4px rgba(0,21,41,.08)' }}>
           <Space size="large">
+            <LanguageSwitcher />
             <Popover
               content={notificationContent}
               trigger="click"
@@ -248,37 +245,37 @@ export default function MainLayout() {
   );
 }
 
-function getMenuItems(role: string) {
+function getMenuItems(role: string, t: (key: string) => string) {
   const dashboard = [
-    { key: '/', icon: <DashboardOutlined />, label: 'Dashboard' },
+    { key: '/', icon: <DashboardOutlined />, label: t('nav.dashboard') },
   ];
 
   const hayvanci = [
-    { key: '/butchery',          icon: <ScissorOutlined />,       label: 'Parçalama' },
-    { key: '/raw-materials',     icon: <InboxOutlined />,         label: 'Hammadde Stoğu' },
-    { key: '/producer-listings', icon: <UnorderedListOutlined />, label: 'Üretici İlanları' },
-    { key: '/orders',            icon: <ShoppingCartOutlined />,  label: 'Siparişlerim' },
-    { key: '/farmer-listings',   icon: <TagsOutlined />,          label: 'İlanlarım' },
-    { key: '/sales',             icon: <DollarCircleOutlined />,  label: 'Satışlarım' },
-    { key: '/lots',              icon: <AuditOutlined />,         label: 'Lot Yönetimi' },
-    { key: '/recalls',           icon: <WarningOutlined />,       label: 'Geri Çağırmalar' },
+    { key: '/butchery',          icon: <ScissorOutlined />,       label: t('nav.butchery') },
+    { key: '/raw-materials',     icon: <InboxOutlined />,         label: t('nav.rawMaterials') },
+    { key: '/producer-listings', icon: <UnorderedListOutlined />, label: t('nav.producerListings') },
+    { key: '/orders',            icon: <ShoppingCartOutlined />,  label: t('nav.orders') },
+    { key: '/farmer-listings',   icon: <TagsOutlined />,          label: t('nav.farmerListings') },
+    { key: '/sales',             icon: <DollarCircleOutlined />,  label: t('nav.sales') },
+    { key: '/lots',              icon: <AuditOutlined />,         label: t('nav.lots') },
+    { key: '/recalls',           icon: <WarningOutlined />,       label: t('nav.recalls') },
   ];
 
   const sucukcu = [
-    { key: '/producer-listings-manage', icon: <TagsOutlined />,          label: 'İlanlarım' },
-    { key: '/producer-orders',          icon: <ShoppingCartOutlined />,  label: 'Gelen Siparişler' },
-    { key: '/production',               icon: <ForkOutlined />,          label: 'Üretim' },
+    { key: '/producer-listings-manage', icon: <TagsOutlined />,          label: t('nav.farmerListings') },
+    { key: '/producer-orders',          icon: <ShoppingCartOutlined />,  label: t('nav.producerOrders') },
+    { key: '/production',               icon: <ForkOutlined />,          label: t('nav.production') },
   ];
 
   const market = [
-    { key: '/market-listings', icon: <UnorderedListOutlined />, label: 'Ürün İlanları' },
-    { key: '/purchases',       icon: <ShoppingCartOutlined />,  label: 'Satın Almalarım' },
+    { key: '/market-listings', icon: <UnorderedListOutlined />, label: t('nav.marketListings') },
+    { key: '/purchases',       icon: <ShoppingCartOutlined />,  label: t('nav.purchases') },
   ];
 
   const roleMenus: Record<string, typeof dashboard> = { hayvanci, sucukcu, market };
   const common = [
-    { key: '/invoices', icon: <FileTextOutlined />, label: 'Faturalar' },
-    { key: '/reports',  icon: <BarChartOutlined />, label: 'Raporlar ve Analiz' },
+    { key: '/invoices', icon: <FileTextOutlined />, label: t('nav.invoices') },
+    { key: '/reports',  icon: <BarChartOutlined />, label: t('nav.reports') },
   ];
   return [...dashboard, ...(roleMenus[role] || []), ...common];
 }

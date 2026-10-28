@@ -10,10 +10,13 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { reportService, mlService, anomalyService } from '../../services/api';
+import { useTranslation } from '../../i18n';
+import { formatUnit, formatDbStatus, formatDbPart } from '../../i18n/formatters';
 
 const { Title, Text, Paragraph } = Typography;
 
 export default function ReportsPage() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
 
   // Veri durumları
@@ -405,15 +408,15 @@ export default function ReportsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
           <Title level={3} style={{ margin: 0 }}>
-            <BarChartOutlined /> Yönetim, Maliyet ve Raporlama Merkezi
+            <BarChartOutlined /> {t('reports.title')}
           </Title>
           <Text type="secondary" style={{ fontSize: 13 }}>
-            Alış, üretim, parçalama, lot hareketleri, satış ve geri çağırma analizleri
+            {t('reports.subtitle')}
           </Text>
         </div>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={() => { loadAllReports(); loadMlEvaluation(); }}>
-            Yenile
+            {t('common.refresh')}
           </Button>
         </Space>
       </div>
@@ -424,14 +427,14 @@ export default function ReportsPage() {
           <Col xs={24} sm={12} lg={6}>
             <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #1890ff' }}>
               <Statistic
-                title="Toplam Hammadde Alış Maliyeti"
+                title={t('dashboard.kpiTotalRawCost')}
                 value={summary.rawMaterials?.totalCost || 0}
                 precision={2}
                 suffix="€"
                 valueStyle={{ color: '#1890ff' }}
               />
               <Text type="secondary" style={{ fontSize: 11 }}>
-                {summary.rawMaterials?.itemCount || 0} kalem hammadde kaydı
+                {summary.rawMaterials?.itemCount || 0} {t('common.quantity')}
               </Text>
             </Card>
           </Col>
@@ -439,7 +442,7 @@ export default function ReportsPage() {
           <Col xs={24} sm={12} lg={6}>
             <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #fa8c16' }}>
               <Statistic
-                title="Ortalama Üretim EKP"
+                title={t('dashboard.kpiAvgEkp')}
                 value={summary.production?.avgEkp || 0}
                 precision={4}
                 suffix="€/kg"
@@ -454,14 +457,14 @@ export default function ReportsPage() {
           <Col xs={24} sm={12} lg={6}>
             <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #52c41a' }}>
               <Statistic
-                title="Toplam Satış Cirosu"
+                title={t('dashboard.kpiSalesRevenue')}
                 value={summary.sales?.totalRevenue || 0}
                 precision={2}
                 suffix="€"
                 valueStyle={{ color: '#52c41a' }}
               />
               <Text type="secondary" style={{ fontSize: 11 }}>
-                {summary.sales?.saleCount || 0} market satışı · {summary.sales?.totalSoldQty || 0} adet/kg
+                {summary.sales?.saleCount || 0} {t('nav.sales')} · {summary.sales?.totalSoldQty || 0} {t('common.unit')}
               </Text>
             </Card>
           </Col>
@@ -469,14 +472,14 @@ export default function ReportsPage() {
           <Col xs={24} sm={12} lg={6}>
             <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #cf1322' }}>
               <Statistic
-                title="Ortalama Parçalama Firesi"
+                title={t('dashboard.kpiWasteRate')}
                 value={summary.butchery?.averageWastePercent || 0}
                 precision={2}
                 suffix="%"
                 valueStyle={{ color: (summary.butchery?.averageWastePercent || 0) > 10 ? '#cf1322' : '#52c41a' }}
               />
               <Text type="secondary" style={{ fontSize: 11 }}>
-                {summary.lots?.recalledLots || 0} geri çağrılan / bloke lot
+                {summary.lots?.recalledLots || 0} {t('common.recalled')} / {t('common.blocked')}
               </Text>
             </Card>
           </Col>
@@ -493,15 +496,15 @@ export default function ReportsPage() {
           // SEKME 1: ÜRETİM VE EKP MALİYET RAPORU
           {
             key: 'production',
-            label: <span><ExperimentOutlined /> Üretim & EKP</span>,
+            label: <span><ExperimentOutlined /> {t('reports.tabProduction')}</span>,
             children: (
               <div>
                 <Alert
                   type="info"
                   showIcon
                   style={{ marginBottom: 16 }}
-                  message="EKP Hesaplama Mantığı:"
-                  description="EKP = (Toplam Hammadde Maliyeti + Üretici Hizmet Bedeli) / Gerçek Mamul Miktarı. VKP = EKP × 1.38 (%38 brüt marj)."
+                  message={t('reports.ekpLogicTitle')}
+                  description={t('reports.ekpLogicDesc')}
                 />
                 <Table
                   dataSource={production}
@@ -516,15 +519,15 @@ export default function ReportsPage() {
           // SEKME 2: PARÇALAMA VE FİRE DENGE RAPORU
           {
             key: 'butchery',
-            label: <span><ScissorOutlined /> Parçalama & Fire</span>,
+            label: <span><ScissorOutlined /> {t('reports.tabButchery')}</span>,
             children: (
               <div>
                 <Alert
                   type="success"
                   showIcon
                   style={{ marginBottom: 16 }}
-                  message="Kuzu & Dana Parçalama Maliyet Korunum İlkesi:"
-                  description="Parçalama işleminde toplam girdi ağırlığı (net parçalar + fire) tam korunmalıdır. Dağıtılan toplam parça maliyeti, hayvanın gerçek alış maliyetine eşit olmalıdır."
+                  message={t('butchery.principleTitle')}
+                  description={t('reports.conservationDesc')}
                 />
                 <Table
                   dataSource={butchery}
@@ -534,15 +537,15 @@ export default function ReportsPage() {
                   expandable={{
                     expandedRowRender: (record) => (
                       <div style={{ margin: '8px 16px', background: '#fafafa', padding: 16, borderRadius: 8 }}>
-                        <Text strong style={{ display: 'block', marginBottom: 8 }}>Elde Edilen Parçaların Dağılım Tablosu:</Text>
+                        <Text strong style={{ display: 'block', marginBottom: 8 }}>{t('butchery.producedLotsTitle')}:</Text>
                         <Row gutter={[8, 8]}>
                           {(record.parts || []).map((p: any) => (
                             <Col span={6} key={p.id}>
                               <Card size="small">
-                                <Text strong>{p.part_name}</Text>
+                                <Text strong>{formatDbPart(p.part_name, t)}</Text>
                                 <div><Tag color="blue">{p.actual_weight_kg} kg</Tag> <Tag color="cyan">%{p.ratio_percent}</Tag></div>
                                 <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 4 }}>
-                                  Maliyet: {p.allocated_cost} € ({p.unit_cost} €/kg)
+                                  {t('common.totalCost')}: {p.allocated_cost} € ({p.unit_cost} €/kg)
                                 </div>
                               </Card>
                             </Col>
@@ -559,7 +562,7 @@ export default function ReportsPage() {
           // SEKME 3: LOT HAREKETLERİ DENETİM İZİ
           {
             key: 'movements',
-            label: <span><InboxOutlined /> Lot Hareketleri</span>,
+            label: <span><InboxOutlined /> {t('reports.tabMovements')}</span>,
             children: (
               <div>
                 <Table
@@ -575,7 +578,7 @@ export default function ReportsPage() {
           // SEKME 4: SATIŞ VE CİRO RAPORU
           {
             key: 'sales',
-            label: <span><ShoppingOutlined /> Satış & Ciro</span>,
+            label: <span><ShoppingOutlined /> {t('reports.tabSales')}</span>,
             children: (
               <div>
                 <Table
@@ -591,15 +594,15 @@ export default function ReportsPage() {
           // SEKME 5: GERİ ÇAĞIRMA (RECALL) RAPORU
           {
             key: 'recalls',
-            label: <span><WarningOutlined /> Geri Çağırma</span>,
+            label: <span><WarningOutlined /> {t('reports.tabRecalls')}</span>,
             children: (
               <div>
                 <Alert
                   type="warning"
                   showIcon
                   style={{ marginBottom: 16 }}
-                  message="Geri Çağırma Senaryosu (Zorunlu Madde 3):"
-                  description="Sorunlu ET-2026-001 hammadde lotundan üretilen SUC-2026-045 mamul lotu ve bu mamulün sevk edildiği Market A, B, C partileri tespit edilip bloke edilir."
+                  message={t('recalls.title')}
+                  description={t('reports.recallScenarioDesc')}
                 />
                 <Table
                   dataSource={recalls}
@@ -610,16 +613,16 @@ export default function ReportsPage() {
                     expandedRowRender: (record) => (
                       <div style={{ margin: '8px 16px', background: '#fff1f0', padding: 12, borderRadius: 8, border: '1px solid #ffa39e' }}>
                         <Text strong style={{ color: '#cf1322', display: 'block', marginBottom: 6 }}>
-                          Etkilenen ve Bloke Edilen Marketler ({record.affectedMarkets?.length || 0}):
+                          {t('recalls.affectedMarkets')} ({record.affectedMarkets?.length || 0}):
                         </Text>
                         <Row gutter={[12, 12]}>
                           {(record.affectedMarkets || []).map((m: any, idx: number) => (
                             <Col span={8} key={idx}>
                               <Card size="small" style={{ background: '#fff' }}>
                                 <Text strong>{m.market_name}</Text>
-                                <div>Telefon: {m.market_phone || '—'}</div>
-                                <div>Miktar: <Tag color="volcano">{m.quantity} {m.unit}</Tag></div>
-                                <div>Durum: <Tag color="red">{m.status}</Tag></div>
+                                <div>{t('common.phone')}: {m.market_phone || '—'}</div>
+                                <div>{t('common.quantity')}: <Tag color="volcano">{m.quantity} {formatUnit(m.unit, t)}</Tag></div>
+                                <div>{t('common.status')}: <Tag color="red">{formatDbStatus(m.status, t)}</Tag></div>
                               </Card>
                             </Col>
                           ))}
@@ -635,7 +638,7 @@ export default function ReportsPage() {
           // SEKME 6: YAPAY ZEKA (ML) DOĞRULAMA VE REFERANS MODEL KARŞILAŞTIRMASI
           {
             key: 'ml_evaluation',
-            label: <span>🤖 Yapay Zeka (ML)</span>,
+            label: <span>🤖 {t('reports.tabMl')}</span>,
             children: (
               <div>
                 {mlLoading ? (
@@ -648,7 +651,7 @@ export default function ReportsPage() {
                         title={
                           <Space>
                             <ExperimentOutlined style={{ color: '#1890ff' }} />
-                            <span>{mlProdEval.model_name} — Hata Ölçümü & Baseline Karşılaştırması</span>
+                            <span>{mlProdEval.model_name} — {t('reports.mlModelTitle')}</span>
                           </Space>
                         }
                         style={{ marginBottom: 20, borderRadius: 10 }}
@@ -657,34 +660,34 @@ export default function ReportsPage() {
                           type="success"
                           showIcon
                           style={{ marginBottom: 16 }}
-                          message="Model Başarımı ve Doğrulama:"
+                          message={t('reports.modelPerformance')}
                           description={mlProdEval.comparison?.summary}
                         />
 
                         <Row gutter={16} style={{ marginBottom: 16 }}>
                           {/* Baseline Model */}
                           <Col span={12}>
-                            <Card size="small" title="1. Referans Yöntem (Baseline Model)" style={{ background: '#fafafa' }}>
+                            <Card size="small" title={t('reports.baselineTitle')} style={{ background: '#fafafa' }}>
                               <Paragraph type="secondary" style={{ fontSize: 12 }}>
                                 {mlProdEval.baseline_model?.name}
                               </Paragraph>
                               <Descriptions size="small" column={2} bordered>
-                                <Descriptions.Item label="Miktar MAE">
+                                <Descriptions.Item label={t('reports.maeQty')}>
                                   {mlProdEval.baseline_model?.quantity_metrics?.mae} kg
                                 </Descriptions.Item>
-                                <Descriptions.Item label="Miktar RMSE">
+                                <Descriptions.Item label={t('reports.rmseQty')}>
                                   {mlProdEval.baseline_model?.quantity_metrics?.rmse} kg
                                 </Descriptions.Item>
-                                <Descriptions.Item label="Miktar MAPE">
+                                <Descriptions.Item label={t('reports.mapeQty')}>
                                   %{mlProdEval.baseline_model?.quantity_metrics?.mape}
                                 </Descriptions.Item>
-                                <Descriptions.Item label="EKP MAE">
+                                <Descriptions.Item label={t('reports.maeEkp')}>
                                   {mlProdEval.baseline_model?.ekp_metrics?.mae} €
                                 </Descriptions.Item>
-                                <Descriptions.Item label="EKP RMSE">
+                                <Descriptions.Item label={t('reports.rmseEkp')}>
                                   {mlProdEval.baseline_model?.ekp_metrics?.rmse} €
                                 </Descriptions.Item>
-                                <Descriptions.Item label="EKP MAPE">
+                                <Descriptions.Item label={t('reports.mapeEkp')}>
                                   %{mlProdEval.baseline_model?.ekp_metrics?.mape}
                                 </Descriptions.Item>
                               </Descriptions>
@@ -693,31 +696,31 @@ export default function ReportsPage() {
 
                           {/* ML Model */}
                           <Col span={12}>
-                            <Card size="small" title="2. Öğrenen ML Modeli (RandomForest)" style={{ background: '#f6ffed', border: '1px solid #b7eb8f' }}>
+                            <Card size="small" title={t('reports.mlModelTitle')} style={{ background: '#f6ffed', border: '1px solid #b7eb8f' }}>
                               <Paragraph type="secondary" style={{ fontSize: 12 }}>
-                                {mlProdEval.ml_model?.name} · {mlProdEval.sample_count} örneklem
+                                {mlProdEval.ml_model?.name} · {mlProdEval.sample_count} {t('common.details')}
                               </Paragraph>
                               <Descriptions size="small" column={2} bordered>
-                                <Descriptions.Item label="Miktar MAE">
+                                <Descriptions.Item label={t('reports.maeQty')}>
                                   <Text strong style={{ color: '#52c41a' }}>
                                     {mlProdEval.ml_model?.quantity_metrics?.mae} kg
                                   </Text>
                                 </Descriptions.Item>
-                                <Descriptions.Item label="Miktar RMSE">
+                                <Descriptions.Item label={t('reports.rmseQty')}>
                                   {mlProdEval.ml_model?.quantity_metrics?.rmse} kg
                                 </Descriptions.Item>
-                                <Descriptions.Item label="Miktar R² Skoru">
+                                <Descriptions.Item label={t('reports.r2Qty')}>
                                   {mlProdEval.ml_model?.quantity_metrics?.r2}
                                 </Descriptions.Item>
-                                <Descriptions.Item label="EKP MAE">
+                                <Descriptions.Item label={t('reports.maeEkp')}>
                                   <Text strong style={{ color: '#52c41a' }}>
                                     {mlProdEval.ml_model?.ekp_metrics?.mae} €
                                   </Text>
                                 </Descriptions.Item>
-                                <Descriptions.Item label="EKP RMSE">
+                                <Descriptions.Item label={t('reports.rmseEkp')}>
                                   {mlProdEval.ml_model?.ekp_metrics?.rmse} €
                                 </Descriptions.Item>
-                                <Descriptions.Item label="EKP R² Skoru">
+                                <Descriptions.Item label={t('reports.r2Ekp')}>
                                   {mlProdEval.ml_model?.ekp_metrics?.r2}
                                 </Descriptions.Item>
                               </Descriptions>
@@ -726,13 +729,13 @@ export default function ReportsPage() {
                         </Row>
 
                         <Descriptions size="small" bordered column={1}>
-                          <Descriptions.Item label="Kullanılan Öznitelikler (Features)">
+                          <Descriptions.Item label={t('reports.featuresUsed')}>
                             {mlProdEval.features?.join(', ')}
                           </Descriptions.Item>
-                          <Descriptions.Item label="Model Yaklaşımı ve Metodoloji">
+                          <Descriptions.Item label={t('reports.modelApproach')}>
                             {mlProdEval.methodology}
                           </Descriptions.Item>
-                          <Descriptions.Item label="Veri Sınırlılıkları (Limitations)">
+                          <Descriptions.Item label={t('reports.limitations')}>
                             {mlProdEval.limitations}
                           </Descriptions.Item>
                         </Descriptions>
@@ -745,7 +748,7 @@ export default function ReportsPage() {
                         title={
                           <Space>
                             <ScissorOutlined style={{ color: '#52c41a' }} />
-                            <span>{mlButchEval.model_name} — Reçete vs ML Karşılaştırması</span>
+                            <span>{mlButchEval.model_name} — {t('reports.mlModelTitle')}</span>
                           </Space>
                         }
                         style={{ borderRadius: 10 }}
@@ -754,15 +757,15 @@ export default function ReportsPage() {
                           type="info"
                           showIcon
                           style={{ marginBottom: 16 }}
-                          message="Parçalama Verimi Değerlendirmesi:"
+                          message={t('reports.butcheryYieldEval')}
                           description={mlButchEval.comparison?.summary}
                         />
 
                         <Row gutter={16} style={{ marginBottom: 16 }}>
                           <Col span={12}>
-                            <Card size="small" title="Referans Yöntem (Sabit Reçete)" style={{ background: '#fafafa' }}>
+                            <Card size="small" title={t('reports.fixedRecipeRef')} style={{ background: '#fafafa' }}>
                               <Statistic
-                                title="Ortalama Parça Başı Hata (MAE)"
+                                title={t('reports.avgPartError')}
                                 value={mlButchEval.baseline_model?.average_mae_kg}
                                 precision={4}
                                 suffix="kg"
@@ -770,9 +773,9 @@ export default function ReportsPage() {
                             </Card>
                           </Col>
                           <Col span={12}>
-                            <Card size="small" title="Regresyon Modeli (ML)" style={{ background: '#f6ffed', border: '1px solid #b7eb8f' }}>
+                            <Card size="small" title={t('reports.mlRegression')} style={{ background: '#f6ffed', border: '1px solid #b7eb8f' }}>
                               <Statistic
-                                title="Ortalama Parça Başı Hata (MAE)"
+                                title={t('reports.avgPartError')}
                                 value={mlButchEval.ml_model?.average_mae_kg}
                                 precision={4}
                                 suffix="kg"
@@ -780,7 +783,7 @@ export default function ReportsPage() {
                                 prefix={<ArrowDownOutlined />}
                               />
                               <Text type="secondary" style={{ fontSize: 11 }}>
-                                %{mlButchEval.comparison?.mae_reduction_percent} hata azalması
+                                %{mlButchEval.comparison?.mae_reduction_percent} {t('reports.errorReduction')}
                               </Text>
                             </Card>
                           </Col>
@@ -793,19 +796,19 @@ export default function ReportsPage() {
                           pagination={false}
                           style={{ marginBottom: 16 }}
                           columns={[
-                            { title: 'Parça Adı', dataIndex: 'part_name', key: 'part_name', render: (v: string) => <strong>{v}</strong> },
-                            { title: 'Reçete Oranı', dataIndex: 'recipe_ratio', key: 'recipe_ratio', render: (v: number) => `%${(v * 100).toFixed(1)}` },
-                            { title: 'Ort. Gerçek (kg)', dataIndex: 'avg_actual_kg', key: 'avg_actual_kg', render: (v: number) => `${v} kg` },
+                            { title: t('butchery.partName'), dataIndex: 'part_name', key: 'part_name', render: (v: string) => <strong>{formatDbPart(v, t)}</strong> },
+                            { title: t('reports.recipeRatio'), dataIndex: 'recipe_ratio', key: 'recipe_ratio', render: (v: number) => `%${(v * 100).toFixed(1)}` },
+                            { title: t('reports.avgActual'), dataIndex: 'avg_actual_kg', key: 'avg_actual_kg', render: (v: number) => `${v} kg` },
                             { title: 'Baseline MAE (kg)', dataIndex: 'baseline_mae_kg', key: 'baseline_mae_kg', render: (v: number) => `${v.toFixed(3)} kg` },
                             { title: 'ML MAE (kg)', dataIndex: 'ml_mae_kg', key: 'ml_mae_kg', render: (v: number) => <Tag color="green">{v.toFixed(3)} kg</Tag> },
                           ]}
                         />
 
                         <Descriptions size="small" bordered column={1}>
-                          <Descriptions.Item label="Metodoloji">
+                          <Descriptions.Item label={t('reports.modelApproach')}>
                             {mlButchEval.methodology}
                           </Descriptions.Item>
-                          <Descriptions.Item label="Sınırlılıklar">
+                          <Descriptions.Item label={t('reports.limitations')}>
                             {mlButchEval.limitations}
                           </Descriptions.Item>
                         </Descriptions>
@@ -822,7 +825,7 @@ export default function ReportsPage() {
             key: 'anomalies',
             label: (
               <Space size={4}>
-                <span>🚨 Anomali & Risk</span>
+                <span>🚨 {t('reports.tabAnomalies')}</span>
                 {anomaliesData.summary?.total > 0 && (
                   <Tag
                     color={anomaliesData.summary?.critical > 0 ? 'red' : 'orange'}
@@ -839,8 +842,8 @@ export default function ReportsPage() {
                   type="warning"
                   showIcon
                   style={{ marginBottom: 16 }}
-                  message="Akıllı Anomali ve Risk Tespit Sistemi"
-                  description="Sistem; et üretim süreçlerindeki beklenmeyen yüksek fireleri (> %20), olağandışı EKP maliyet sıçramalarını, parçalama atık oranlarını ve geri çağrılan lotların kardeş partilerini otomatik olarak tespit eder."
+                  message={t('reports.anomalySystemTitle')}
+                  description={t('reports.anomalySystemDesc')}
                 />
 
                 {/* Anomali İstatistik Kartları */}
@@ -848,37 +851,34 @@ export default function ReportsPage() {
                   <Col span={6}>
                     <Card size="small" style={{ borderLeft: '4px solid #1890ff' }}>
                       <Statistic
-                        title="Tespit Edilen Anomali"
+                        title={t('reports.anomalyTotalDetected')}
                         value={anomaliesData.summary?.total || 0}
-                        suffix="kayıt"
                       />
                     </Card>
                   </Col>
                   <Col span={6}>
                     <Card size="small" style={{ borderLeft: '4px solid #ff4d4f' }}>
                       <Statistic
-                        title="Kritik Riskler"
+                        title={t('reports.anomalyCritical')}
                         value={anomaliesData.summary?.critical || 0}
                         valueStyle={{ color: '#ff4d4f' }}
-                        suffix="adet"
                       />
                     </Card>
                   </Col>
                   <Col span={6}>
                     <Card size="small" style={{ borderLeft: '4px solid #faad14' }}>
                       <Statistic
-                        title="Uyarı Seviyesinde"
+                        title={t('reports.anomalyWarning')}
                         value={anomaliesData.summary?.warning || 0}
                         valueStyle={{ color: '#faad14' }}
-                        suffix="adet"
                       />
                     </Card>
                   </Col>
                   <Col span={6}>
                     <Card size="small" style={{ borderLeft: `4px solid ${anomaliesData.summary?.healthy ? '#52c41a' : '#ff4d4f'}` }}>
                       <Statistic
-                        title="Genel Sağlık Durumu"
-                        value={anomaliesData.summary?.healthy ? 'Temiz' : 'Risk Var'}
+                        title={t('reports.anomalyNormal')}
+                        value={anomaliesData.summary?.healthy ? t('common.success') : t('common.error')}
                         valueStyle={{ color: anomaliesData.summary?.healthy ? '#52c41a' : '#ff4d4f', fontSize: 18 }}
                       />
                     </Card>
@@ -892,9 +892,9 @@ export default function ReportsPage() {
                     onChange={e => setAnomalyFilter(e.target.value)}
                     buttonStyle="solid"
                   >
-                    <Radio.Button value="all">Tümü ({anomaliesData.summary?.total || 0})</Radio.Button>
-                    <Radio.Button value="critical">🚨 Kritik Riskler ({anomaliesData.summary?.critical || 0})</Radio.Button>
-                    <Radio.Button value="warning">⚠️ Uyarılar ({anomaliesData.summary?.warning || 0})</Radio.Button>
+                    <Radio.Button value="all">{t('common.all')} ({anomaliesData.summary?.total || 0})</Radio.Button>
+                    <Radio.Button value="critical">🚨 {t('reports.anomalyCritical')} ({anomaliesData.summary?.critical || 0})</Radio.Button>
+                    <Radio.Button value="warning">⚠️ {t('reports.anomalyWarning')} ({anomaliesData.summary?.warning || 0})</Radio.Button>
                   </Radio.Group>
                 </div>
 
@@ -909,18 +909,18 @@ export default function ReportsPage() {
                   pagination={{ pageSize: 10 }}
                   columns={[
                     {
-                      title: 'Seviye',
+                      title: t('reports.severity'),
                       dataIndex: 'severity',
                       key: 'severity',
                       width: 100,
                       render: (v: string) => (
                         <Tag color={v === 'critical' ? 'red' : v === 'warning' ? 'orange' : 'blue'}>
-                          {v === 'critical' ? 'KRİTİK' : v === 'warning' ? 'UYARI' : 'BİLGİ'}
+                          {v === 'critical' ? t('reports.critical') : v === 'warning' ? t('reports.warning') : t('reports.info')}
                         </Tag>
                       ),
                     },
                     {
-                      title: 'İlgili Kayıt',
+                      title: t('reports.relatedEntity'),
                       dataIndex: 'entity_code',
                       key: 'entity_code',
                       width: 150,
@@ -932,7 +932,7 @@ export default function ReportsPage() {
                       ),
                     },
                     {
-                      title: 'Anomali Başlığı ve Detayı',
+                      title: t('reports.anomalyTitleAndDetail'),
                       key: 'details',
                       render: (_: unknown, r: any) => (
                         <div>
@@ -943,31 +943,31 @@ export default function ReportsPage() {
                             {r.description}
                           </Paragraph>
                           <div style={{ background: '#fffbe6', padding: '6px 10px', borderRadius: 6, border: '1px solid #ffe58f', fontSize: 12 }}>
-                            <Text strong style={{ color: '#ad6800' }}>💡 Önerilen Aksiyon: </Text>
+                            <Text strong style={{ color: '#ad6800' }}>{t('reports.suggestedAction')}</Text>
                             <span>{r.suggested_action}</span>
                           </div>
                         </div>
                       ),
                     },
                     {
-                      title: 'Ölçülen / Eşik',
+                      title: t('reports.measuredThreshold'),
                       key: 'metric',
                       width: 160,
                       render: (_: unknown, r: any) => (
                         <div>
                           <div>
-                            <Text type="secondary" style={{ fontSize: 11 }}>Ölçülen: </Text>
+                            <Text type="secondary" style={{ fontSize: 11 }}>{t('reports.measured')}</Text>
                             <Text strong style={{ color: '#ff4d4f' }}>{r.metric_value} {r.metric_unit}</Text>
                           </div>
                           <div>
-                            <Text type="secondary" style={{ fontSize: 11 }}>Eşik Değer: </Text>
+                            <Text type="secondary" style={{ fontSize: 11 }}>{t('reports.threshold')}</Text>
                             <Text strong>{r.threshold_value} {r.metric_unit}</Text>
                           </div>
                         </div>
                       ),
                     },
                     {
-                      title: 'Tarih',
+                      title: t('common.date'),
                       dataIndex: 'created_at',
                       key: 'created_at',
                       width: 120,

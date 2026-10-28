@@ -1,5 +1,6 @@
 import React from 'react';
 import { Select, Tag } from 'antd';
+import { useTranslation } from '../i18n';
 
 export type SupportedCurrency = 'EUR' | 'TRY' | 'USD' | 'GBP';
 
@@ -116,13 +117,14 @@ export const EurEquivalentPreview: React.FC<{
   amount: number | null | undefined;
   currency: string;
 }> = ({ amount, currency }) => {
+  const { t } = useTranslation();
   const norm = normalizeCurrency(currency);
   if (norm === 'EUR' || !amount || amount <= 0) return null;
   const eurVal = convertToEur(amount, norm);
   return (
     <div style={{ marginTop: 4 }}>
       <Tag color="blue" style={{ fontSize: 11 }}>
-        Kur Karşılığı: ≈ {eurVal.toFixed(2)} € (1 EUR ≈ {norm === 'TRY' ? '37.50 ₺' : norm === 'USD' ? '1.08 $' : '0.85 £'})
+        {t('common.equivalent')}: ≈ {eurVal.toFixed(2)} € (1 EUR ≈ {norm === 'TRY' ? '37.50 ₺' : norm === 'USD' ? '1.08 $' : '0.85 £'})
       </Tag>
     </div>
   );

@@ -14,6 +14,8 @@ import { purchaseService, invoiceService } from '../../services/api';
 import { Invoice } from '../../types';
 import { InvoiceModal } from '../../components/InvoiceModal';
 import { formatMoney, convertToEur } from '../../utils/currency';
+import { useTranslation } from '../../i18n';
+import { formatUnit, formatDbProduct } from '../../i18n/formatters';
 
 const { Title, Text } = Typography;
 
@@ -53,6 +55,7 @@ interface ComplaintItem {
 }
 
 export default function FarmerSalesPage() {
+  const { t } = useTranslation();
   const { message } = App.useApp();
   const navigate = useNavigate();
 
@@ -73,10 +76,10 @@ export default function FarmerSalesPage() {
         setSelectedInvoice(data[0]);
         setInvoiceModalVisible(true);
       } else {
-        message.warning('Bu satışa ait fatura bulunamadı');
+        message.warning(t('sales.invoiceNotFound'));
       }
     } catch {
-      message.error('Fatura yüklenemedi');
+      message.error(t('sales.invoiceLoadError'));
     }
   }
 
@@ -90,7 +93,7 @@ export default function FarmerSalesPage() {
       setSales(salesRes.data || []);
       setComplaints(complaintsRes.data || []);
     } catch {
-      message.error('Satış bilgileri yüklenemedi');
+      message.error(t('sales.salesLoadError'));
     } finally {
       setLoading(false);
     }
@@ -113,24 +116,24 @@ export default function FarmerSalesPage() {
 
   const columns = [
     {
-      title: 'Ürün / Lot',
+      title: `${t('listings.productName')} / ${t('common.lotNumber')}`,
       key: 'product',
       render: (_: unknown, r: SaleItem) => (
         <div>
-          <Text strong>{r.product_name || r.lot_number}</Text>
+          <Text strong>{formatDbProduct(r.product_name, t) || r.lot_number}</Text>
           <div>
             <Tag color={r.lot_status === 'recalled' ? 'red' : 'blue'} style={{ fontSize: 11 }}>
               {r.lot_number}
             </Tag>
             {r.lot_status === 'recalled' && (
-              <Tag color="red" style={{ fontSize: 11 }}>Geri Çekildi</Tag>
+              <Tag color="red" style={{ fontSize: 11 }}>{t('common.recalled')}</Tag>
             )}
           </div>
         </div>
       ),
     },
     {
-      title: 'Alıcı Market',
+      title: t('sales.buyerMarket'),
       key: 'market',
       render: (_: unknown, r: SaleItem) => (
         <div>
@@ -147,18 +150,18 @@ export default function FarmerSalesPage() {
       ),
     },
     {
-      title: 'Miktar',
+      title: t('common.quantity'),
       key: 'quantity',
-      render: (_: unknown, r: SaleItem) => `${Number(r.quantity).toFixed(2)} ${r.unit}`,
+      render: (_: unknown, r: SaleItem) => `${Number(r.quantity).toFixed(2)} ${formatUnit(r.unit, t)}`,
     },
     {
-      title: 'Birim Fiyat',
+      title: t('common.unitPrice'),
       dataIndex: 'unit_price',
       key: 'unit_price',
-      render: (v: number, r: SaleItem) => `${formatMoney(v, r.currency)} / ${r.unit}`,
+      render: (v: number, r: SaleItem) => `${formatMoney(v, r.currency)} / ${formatUnit(r.unit, t)}`,
     },
     {
-      title: 'Toplam Tutar',
+      title: t('common.totalPrice'),
       dataIndex: 'total_price',
       key: 'total_price',
       render: (v: number, r: SaleItem) => (
@@ -168,29 +171,29 @@ export default function FarmerSalesPage() {
       ),
     },
     {
-      title: 'Kalite Durumu',
+      title: t('common.status'),
       key: 'status',
       render: (_: unknown, r: SaleItem) => {
         const hasIssue = Number(r.complaint_count || 0) > 0;
         if (r.lot_status === 'recalled') {
-          return <Tag color="error">⚠️ Geri Çağrıldı</Tag>;
+          return <Tag color="error">⚠️ {t('common.recalled')}</Tag>;
         }
         if (hasIssue) {
           return (
-            <Badge status="error" text={<Tag color="error">Sorun Bildirildi ({r.complaint_count})</Tag>} />
+            <Badge status="error" text={<Tag color="error">{t('market.reportComplaint')} ({r.complaint_count})</Tag>} />
           );
         }
-        return <Tag color="success"><CheckCircleOutlined /> Sorunsuz</Tag>;
+        return <Tag color="success"><CheckCircleOutlined /> {t('common.active')}</Tag>;
       },
     },
     {
-      title: 'Satış Tarihi',
+      title: t('sales.saleDate'),
       dataIndex: 'purchase_date',
       key: 'purchase_date',
       render: (v: string) => dayjs(v).format('DD.MM.YYYY HH:mm'),
     },
     {
-      title: 'İşlem',
+      title: t('common.actions'),
       key: 'actions',
       render: (_: unknown, r: SaleItem) => (
         <Space size="small">
@@ -199,14 +202,14 @@ export default function FarmerSalesPage() {
             icon={<FileTextOutlined />}
             onClick={() => openInvoice(r.id)}
           >
-            Fatura
+            {t('invoices.title')}
           </Button>
           <Button
             size="small"
             icon={<EyeOutlined />}
             onClick={() => { setSelectedSale(r); setDetailOpen(true); }}
           >
-            Detay
+            {t('common.details')}
           </Button>
           <Button
             size="small"
@@ -214,7 +217,7 @@ export default function FarmerSalesPage() {
             style={{ padding: 0 }}
             onClick={() => navigate(`/lots/${r.lot_id}/trace`)}
           >
-            İzle
+            {t('nav.lotTrace')}
           </Button>
           {(Number(r.complaint_count || 0) > 0 || r.lot_status === 'recalled') && (
             <Button
@@ -222,7 +225,7 @@ export default function FarmerSalesPage() {
               danger
               onClick={() => navigate('/recalls')}
             >
-              Geri Çağır
+              {t('recalls.startRecall')}
             </Button>
           )}
         </Space>
@@ -232,21 +235,21 @@ export default function FarmerSalesPage() {
 
   const complaintColumns = [
     {
-      title: 'Sorun Bildirilen Lot',
+      title: t('common.lotNumber'),
       key: 'lot',
       render: (_: unknown, c: ComplaintItem) => (
         <div>
           <Tag color="red" style={{ fontSize: 12, fontWeight: 600 }}>{c.lot_number}</Tag>
           <div style={{ marginTop: 2 }}>
             <Tag color={c.lot_status === 'recalled' ? 'red' : 'default'} style={{ fontSize: 10 }}>
-              {c.lot_status === 'recalled' ? 'Geri Çekildi (Bloke)' : 'Aktif'}
+              {c.lot_status === 'recalled' ? t('common.recalled') : t('common.active')}
             </Tag>
           </div>
         </div>
       ),
     },
     {
-      title: 'Bildirim Başlığı & Mesajı',
+      title: t('common.description'),
       key: 'message',
       render: (_: unknown, c: ComplaintItem) => (
         <div>
@@ -260,13 +263,13 @@ export default function FarmerSalesPage() {
       ),
     },
     {
-      title: 'Tarih',
+      title: t('common.date'),
       dataIndex: 'created_at',
       key: 'created_at',
       render: (v: string) => dayjs(v).format('DD.MM.YYYY HH:mm'),
     },
     {
-      title: 'Hızlı Aksiyon',
+      title: t('common.actions'),
       key: 'action',
       render: (_: unknown, c: ComplaintItem) => (
         <Space>
@@ -275,7 +278,7 @@ export default function FarmerSalesPage() {
             icon={<EyeOutlined />}
             onClick={() => navigate(`/lots/${c.lot_id}/trace`)}
           >
-            Lot İzleme
+            {t('nav.lotTrace')}
           </Button>
           <Button
             size="small"
@@ -283,7 +286,7 @@ export default function FarmerSalesPage() {
             icon={<WarningOutlined />}
             onClick={() => navigate('/recalls')}
           >
-            Geri Çağırma Başlat
+            {t('recalls.startRecall')}
           </Button>
         </Space>
       ),
@@ -296,13 +299,13 @@ export default function FarmerSalesPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
           <Title level={3} style={{ margin: 0 }}>
-            <DollarCircleOutlined /> Satışlarım
+            <DollarCircleOutlined /> {t('sales.title')}
           </Title>
           <Text type="secondary" style={{ fontSize: 13 }}>
-            Marketlere yapılan ürün satışları ve gelen kalite / sorun geri bildirimleri
+            {t('sales.subtitle')}
           </Text>
         </div>
-        <Button onClick={loadData}>Yenile</Button>
+        <Button onClick={loadData}>{t('common.refresh')}</Button>
       </div>
 
       {/* Problem Varsa Uyarı Kartı */}
@@ -311,12 +314,12 @@ export default function FarmerSalesPage() {
           type="error"
           showIcon
           style={{ marginBottom: 16 }}
-          message={`Dikkat: Marketlerden ${problemCount} adet satışınız için kalite sorunu bildirilmiştir!`}
+          message={t('sales.complaintAlert')}
           description={
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-              <span>Sorunlu lotları inceleyebilir, ileriye/geriye izleme yapabilir veya geri çağırma başlatabilirsiniz.</span>
+              <span>{t('sales.complaintActionDesc')}</span>
               <Button size="small" danger onClick={() => navigate('/recalls')}>
-                Geri Çağırma Yönetimi
+                {t('recalls.title')}
               </Button>
             </div>
           }
@@ -328,9 +331,8 @@ export default function FarmerSalesPage() {
         <Col span={6}>
           <Card size="small">
             <Statistic
-              title="Toplam Satış"
+              title={t('sales.totalSales')}
               value={sales.length}
-              suffix="işlem"
               prefix={<ShopOutlined />}
             />
           </Card>
@@ -338,7 +340,7 @@ export default function FarmerSalesPage() {
         <Col span={6}>
           <Card size="small">
             <Statistic
-              title="Toplam Satış Geliri"
+              title={t('sales.totalRevenue')}
               value={totalRevenue.toFixed(2)}
               suffix="€"
               valueStyle={{ color: '#52c41a' }}
@@ -348,18 +350,16 @@ export default function FarmerSalesPage() {
         <Col span={6}>
           <Card size="small">
             <Statistic
-              title="Farklı Market Sayısı"
+              title={t('sales.distinctMarkets')}
               value={new Set(sales.map(s => s.market_id)).size}
-              suffix="market"
             />
           </Card>
         </Col>
         <Col span={6}>
           <Card size="small">
             <Statistic
-              title="Sorunlu / Şikayetli Lot"
+              title={t('sales.problemLots')}
               value={problemCount}
-              suffix="adet"
               valueStyle={{ color: problemCount > 0 ? '#cf1322' : '#52c41a' }}
               prefix={<WarningOutlined />}
             />
@@ -373,10 +373,10 @@ export default function FarmerSalesPage() {
         items={[
           {
             key: 'sales',
-            label: `🛒 Satış Listesi (${sales.length})`,
+            label: `🛒 ${t('nav.sales')} (${sales.length})`,
             children: (
               sales.length === 0 && !loading ? (
-                <Empty description="Henüz market satışı gerçekleşmedi" />
+                <Empty description={t('common.noData')} />
               ) : (
                 <Table
                   dataSource={sales}
@@ -392,14 +392,14 @@ export default function FarmerSalesPage() {
             key: 'complaints',
             label: (
               <span>
-                ⚠️ Sorun Bildirimleri{' '}
+                ⚠️ {t('market.reportComplaint')}{' '}
                 {complaints.length > 0 && <Tag color="red">{complaints.length}</Tag>}
               </span>
             ),
             children: (
               complaints.length === 0 && !loading ? (
                 <Empty
-                  description="Harika! Hiçbir marketten sorun bildirimi gelmedi."
+                  description={t('common.noData')}
                   image={Empty.PRESENTED_IMAGE_SIMPLE}
                 />
               ) : (
@@ -430,17 +430,17 @@ export default function FarmerSalesPage() {
                   navigate(`/lots/${selectedSale.lot_id}/trace`);
                 }}
               >
-                Lotu İzle (İleri / Geri)
+                {t('nav.lotTrace')}
               </Button>
             )}
-            <Button onClick={() => setDetailOpen(false)}>Kapat</Button>
+            <Button onClick={() => setDetailOpen(false)}>{t('common.close')}</Button>
           </Space>
         }
         width={560}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <DollarCircleOutlined style={{ color: '#52c41a', fontSize: 20 }} />
-            <span>Satış Detayı — #{selectedSale?.id}</span>
+            <span>{t('sales.detailTitle')} — #{selectedSale?.id}</span>
           </div>
         }
       >
@@ -452,43 +452,43 @@ export default function FarmerSalesPage() {
                 type="warning"
                 showIcon
                 style={{ marginBottom: 16 }}
-                message="Bu lot için market tarafından sorun bildirilmiştir!"
+                message={t('market.reportComplaint')}
                 description={selectedSale.latest_complaint}
               />
             )}
 
             <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
-              <Descriptions.Item label="Alıcı Market" span={2}>
+              <Descriptions.Item label={t('sales.buyerMarket')} span={2}>
                 <Text strong>{selectedSale.market_name}</Text>
               </Descriptions.Item>
               {selectedSale.market_phone && (
-                <Descriptions.Item label="Market Telefon" span={2}>
+                <Descriptions.Item label={t('common.phone')} span={2}>
                   <PhoneOutlined style={{ marginRight: 6 }} />{selectedSale.market_phone}
                 </Descriptions.Item>
               )}
               {selectedSale.market_address && (
-                <Descriptions.Item label="Market Adres" span={2}>
+                <Descriptions.Item label={t('common.address')} span={2}>
                   <EnvironmentOutlined style={{ marginRight: 6 }} />{selectedSale.market_address}
                 </Descriptions.Item>
               )}
-              <Descriptions.Item label="Ürün Adı">
+              <Descriptions.Item label={t('listings.productName')}>
                 {selectedSale.product_name || selectedSale.lot_number}
               </Descriptions.Item>
-              <Descriptions.Item label="Lot Numarası">
+              <Descriptions.Item label={t('common.lotNumber')}>
                 <Tag color="blue">{selectedSale.lot_number}</Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="Satılan Miktar">
+              <Descriptions.Item label={t('common.quantity')}>
                 <Text strong>{Number(selectedSale.quantity).toFixed(2)} {selectedSale.unit}</Text>
               </Descriptions.Item>
-              <Descriptions.Item label="Birim Fiyat">
+              <Descriptions.Item label={t('common.unitPrice')}>
                 {formatMoney(selectedSale.unit_price, selectedSale.currency)} / {selectedSale.unit}
               </Descriptions.Item>
-              <Descriptions.Item label="Toplam Tutar" span={2}>
+              <Descriptions.Item label={t('common.totalPrice')} span={2}>
                 <Text strong style={{ color: '#52c41a', fontSize: 16 }}>
                   {formatMoney(selectedSale.total_price, selectedSale.currency, true)}
                 </Text>
               </Descriptions.Item>
-              <Descriptions.Item label="Satış Tarihi" span={2}>
+              <Descriptions.Item label={t('sales.saleDate')} span={2}>
                 {dayjs(selectedSale.purchase_date).format('DD.MM.YYYY HH:mm:ss')}
               </Descriptions.Item>
             </Descriptions>

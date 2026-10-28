@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons';
 import { listingService, mlService, rawMaterialService, butcheryService, orderService } from '../../services/api';
 import { formatMoney } from '../../utils/currency';
+import { useTranslation } from '../../i18n';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -211,6 +212,7 @@ function methodLabel(m: string) {
 
 // ── Ana Bileşen ───────────────────────────────────────────────────────────────
 export default function ProducerListingsPage() {
+  const { t } = useTranslation();
   const { message: msg } = App.useApp();
 
   const [listings, setListings]         = useState<ProducerListing[]>([]);
@@ -514,13 +516,13 @@ export default function ProducerListingsPage() {
       {/* ── Başlık & Arama ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
-          <Title level={3} style={{ margin: 0 }}>🌭 Üretici İlanları & Fason Üretim</Title>
+          <Title level={3} style={{ margin: 0 }}>🌭 {t('producerListings.title')}</Title>
           <Text type="secondary" style={{ fontSize: 13 }}>
-            Fason üretim yaptırmak istediğiniz ürünü seçin, kasaplık parçalarınızı lotlarıyla siparişe bağlayın.
+            {t('producerListings.subtitle')}
           </Text>
         </div>
         <Search
-          placeholder="İlan veya üretici ara..."
+          placeholder={t('common.search')}
           allowClear
           style={{ width: 280 }}
           prefix={<SearchOutlined />}
@@ -747,18 +749,18 @@ export default function ProducerListingsPage() {
                       icon={<ShoppingCartOutlined />}
                       onClick={e => { e.stopPropagation(); openOrder(listing); }}
                     >
-                      Sipariş Ver
+                      {t('producerListings.orderNow')}
                     </Button>
 
                     <Space size={4}>
-                      <Tooltip title="AI Çıktı & EKP Tahmini">
+                      <Tooltip title={t('producerListings.aiEstimate')}>
                         <Button
                           size="small"
                           icon={<RobotOutlined />}
                           style={{ color: '#722ed1', borderColor: '#722ed1' }}
                           onClick={e => { e.stopPropagation(); openMl(listing); }}
                         >
-                          Tahmin
+                          {t('producerListings.aiEstimate')}
                         </Button>
                       </Tooltip>
                       <Button
@@ -766,7 +768,7 @@ export default function ProducerListingsPage() {
                         icon={<InfoCircleOutlined />}
                         onClick={e => { e.stopPropagation(); setSelListing(listing); setDetailOpen(true); }}
                       >
-                        Detay
+                        {t('common.details')}
                       </Button>
                     </Space>
                   </div>
@@ -797,26 +799,26 @@ export default function ProducerListingsPage() {
           return (
             <div>
               <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
-                <Descriptions.Item label="Üretici" span={2}>
+                <Descriptions.Item label={t('roles.sucukcu')} span={2}>
                   <Text strong>{selListing.producer_name}</Text>
                 </Descriptions.Item>
                 {selListing.phone && (
-                  <Descriptions.Item label={<><PhoneOutlined /> Telefon</>} span={2}>
+                  <Descriptions.Item label={<><PhoneOutlined /> {t('common.phone')}</>} span={2}>
                     {selListing.phone}
                   </Descriptions.Item>
                 )}
                 {selListing.address && (
-                  <Descriptions.Item label={<><EnvironmentOutlined /> Adres</>} span={2}>
+                  <Descriptions.Item label={<><EnvironmentOutlined /> {t('common.address')}</>} span={2}>
                     {selListing.address}
                   </Descriptions.Item>
                 )}
-                <Descriptions.Item label="Hizmet Fiyatı">
+                <Descriptions.Item label={t('producerListings.serviceCost')}>
                   <Text strong style={{ color: '#f50', fontSize: 15 }}>
                     {formatMoney(selListing.service_price, selListing.currency)} / {selListing.service_unit}
                   </Text>
                 </Descriptions.Item>
-                <Descriptions.Item label="Min. Sipariş">
-                  {selListing.min_order_qty ? `${selListing.min_order_qty} ${selListing.service_unit}` : 'Yok'}
+                <Descriptions.Item label={t('producerListings.minOrder')}>
+                  {selListing.min_order_qty ? `${selListing.min_order_qty} ${selListing.service_unit}` : '—'}
                 </Descriptions.Item>
               </Descriptions>
 
@@ -861,7 +863,7 @@ export default function ProducerListingsPage() {
                 style={{ marginTop: 20 }}
                 onClick={() => openOrder(selListing)}
               >
-                Bu İlandan Sipariş Ver
+                {t('producerListings.orderNow')}
               </Button>
             </div>
           );
@@ -878,7 +880,7 @@ export default function ProducerListingsPage() {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <ShoppingCartOutlined style={{ color: '#1890ff', fontSize: 20 }} />
-            <span>{orderListing?.product_name} — Fason Üretim Siparişi</span>
+            <span>{orderListing?.product_name} — {t('producerListings.orderNow')}</span>
             <Tag color="blue" style={{ marginLeft: 4 }}>{orderListing?.producer_name}</Tag>
           </div>
         }
@@ -913,7 +915,7 @@ export default function ProducerListingsPage() {
                   {orderListing.phone && <Text type="secondary" style={{ marginLeft: 12 }}><PhoneOutlined /> {orderListing.phone}</Text>}
                 </div>
                 <div>
-                  <Text type="secondary">Hizmet Bedeli: </Text>
+                  <Text type="secondary">{t('producerListings.serviceCost')}: </Text>
                   <Text strong style={{ color: '#f50', fontSize: 15 }}>
                     {formatMoney(orderListing.service_price, orderListing.currency)} / {orderListing.service_unit}
                   </Text>
