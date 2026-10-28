@@ -152,3 +152,10 @@ export const ocrService = {
   analyze: (payload: { sampleId?: string; rawText?: string; fileName?: string; imageBase64?: string }) =>
     api.post('/ocr/analyze', payload),
 };
+
+// Çoklu Para Birimi & Kur Çevrimi
+export const currencyService = {
+  getRates: () => api.get('/currencies'),
+  convert: (amount: number, from: string, to: string) =>
+    api.post('/currencies/convert', { amount, from, to }),
+};

@@ -13,6 +13,7 @@ import dayjs, { Dayjs } from 'dayjs';
 import { productionService, invoiceService } from '../../services/api';
 import { Invoice } from '../../types';
 import { InvoiceModal } from '../../components/InvoiceModal';
+import { formatMoney, convertToEur, CurrencySelect, EurEquivalentPreview } from '../../utils/currency';
 
 const { Title, Text } = Typography;
 
@@ -97,6 +98,7 @@ export default function ProductionPage() {
   const [completing, setCompleting]     = useState<ProductionOrder | null>(null);
   const [actualQty, setActualQty]       = useState<number | null>(null);
   const [serviceCost, setServiceCost]   = useState<number | null>(null);
+  const [serviceCurrency, setServiceCurrency] = useState<string>('EUR');
   const [productionDate, setProductionDate] = useState<Dayjs>(dayjs());
   const [submitting, setSubmitting]     = useState(false);
   const [result, setResult]             = useState<CompletionResult | null>(null);
@@ -169,9 +171,10 @@ export default function ProductionPage() {
     if (!completing || !actualQty || !serviceCost) return;
     setSubmitting(true);
     try {
+      const costInEur = convertToEur(serviceCost, serviceCurrency);
       const { data } = await productionService.complete(completing.id, {
         actual_qty:      actualQty,
-        service_cost:    serviceCost,
+        service_cost:    costInEur,
         production_date: productionDate.format('YYYY-MM-DD'),
       });
       setResult(data);
@@ -559,17 +562,25 @@ export default function ProductionPage() {
                 <Text style={{ fontSize: 13, display: 'block', marginBottom: 6 }}>
                   Hizmet Bedeli (toplam fason işçilik faturası tutarı)
                 </Text>
-                <InputNumber
-                  min={0} step={0.01} precision={2}
-                  value={serviceCost}
-                  onChange={v => setServiceCost(v)}
-                  addonAfter="€"
-                  style={{ width: '100%' }}
-                  size="large"
-                />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <InputNumber
+                    min={0} step={0.01} precision={2}
+                    value={serviceCost}
+                    onChange={v => setServiceCost(v)}
+                    style={{ flex: 1 }}
+                    size="large"
+                    placeholder="0.00"
+                  />
+                  <CurrencySelect
+                    value={serviceCurrency}
+                    onChange={v => setServiceCurrency(v)}
+                    size="large"
+                  />
+                </div>
+                <EurEquivalentPreview amount={serviceCost} currency={serviceCurrency} />
                 {serviceCost && actualQty && actualQty > 0 && (
                   <Text type="secondary" style={{ fontSize: 11, marginTop: 4, display: 'block' }}>
-                    Paket Başına Hizmet: {(serviceCost / actualQty).toFixed(2)} €/paket
+                    Paket Başına Hizmet: {formatMoney(serviceCost / actualQty, serviceCurrency)} / paket
                   </Text>
                 )}
               </div>

@@ -10,6 +10,7 @@ import dayjs from 'dayjs';
 import { purchaseService, invoiceService } from '../../services/api';
 import { Invoice } from '../../types';
 import { InvoiceModal } from '../../components/InvoiceModal';
+import { formatMoney, convertToEur } from '../../utils/currency';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -29,6 +30,7 @@ interface Purchase {
   unit: string;
   unit_price: number;
   total_price: number;
+  currency?: string;
   status: string;
   purchase_date: string;
 }
@@ -105,7 +107,7 @@ export default function PurchasesPage() {
     }
   }
 
-  const totalSpent = purchases.reduce((sum, p) => sum + Number(p.total_price), 0);
+  const totalSpent = purchases.reduce((sum, p) => sum + convertToEur(Number(p.total_price), p.currency), 0);
   const recalledPurchases = purchases.filter(p => p.lot_status === 'recalled' || p.lot_status === 'blocked');
 
   const columns = [
@@ -144,11 +146,11 @@ export default function PurchasesPage() {
     },
     {
       title: 'Birim Fiyat', dataIndex: 'unit_price', key: 'unit_price',
-      render: (v: number, r: Purchase) => `${Number(v).toFixed(2)} € / ${r.unit}`,
+      render: (v: number, r: Purchase) => `${formatMoney(v, r.currency)} / ${r.unit}`,
     },
     {
       title: 'Toplam Tutar', dataIndex: 'total_price', key: 'total_price',
-      render: (v: number) => <Tag color="green">{Number(v).toFixed(2)} €</Tag>,
+      render: (v: number, r: Purchase) => <Tag color="green">{formatMoney(v, r.currency, true)}</Tag>,
     },
     {
       title: 'Durum', dataIndex: 'status', key: 'status',

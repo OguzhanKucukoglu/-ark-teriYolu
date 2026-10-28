@@ -28,7 +28,8 @@ router.get('/', async (req: AuthRequest, res) => {
 
 // Hammadde ekle
 router.post('/', async (req: AuthRequest, res) => {
-  const { material_type, quantity, unit, unit_price, supplier_name, expiry_date } = req.body;
+  const { material_type, quantity, unit, unit_price, currency, supplier_name, expiry_date } = req.body;
+  const curr = currency ? String(currency).trim().toUpperCase() : 'EUR';
 
   if (!material_type || !quantity || !unit || !unit_price) {
     res.status(400).json({ error: 'material_type, quantity, unit, unit_price zorunludur' });
@@ -52,18 +53,18 @@ router.post('/', async (req: AuthRequest, res) => {
     // Lot kaydı
     const lotId = await insertQuery(
       sequelize,
-      `INSERT INTO lots (lot_number, lot_type, owner_id, quantity, unit, unit_cost, total_cost, supplier_name, expiry_date, status)
-       VALUES (?, 'hammadde', ?, ?, ?, ?, ?, ?, ?, 'active')`,
-      [lotNumber, req.user!.id, quantity, unit, unit_price, totalCost, supplier_name || null, expiry_date || null],
+      `INSERT INTO lots (lot_number, lot_type, owner_id, quantity, unit, unit_cost, total_cost, currency, supplier_name, expiry_date, status)
+       VALUES (?, 'hammadde', ?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
+      [lotNumber, req.user!.id, quantity, unit, unit_price, totalCost, curr, supplier_name || null, expiry_date || null],
       t
     );
 
     // Hammadde kaydı
     const rmId = await insertQuery(
       sequelize,
-      `INSERT INTO raw_materials (owner_id, lot_id, material_type, quantity, unit, unit_price, total_cost)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [req.user!.id, lotId, material_type, quantity, unit, unit_price, totalCost],
+      `INSERT INTO raw_materials (owner_id, lot_id, material_type, quantity, unit, unit_price, total_cost, currency)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.user!.id, lotId, material_type, quantity, unit, unit_price, totalCost, curr],
       t
     );
 

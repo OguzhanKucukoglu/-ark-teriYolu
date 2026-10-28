@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Table, Button, Modal, Form, InputNumber, Typography,
   Tag, App, Divider, Space, Popconfirm, Select, Input,
@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { listingService, lotService } from '../../services/api';
+import { formatMoney, convertToEur, CurrencySelect } from '../../utils/currency';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -37,6 +38,7 @@ interface FarmerListing {
   quantity: number;
   unit: string;
   unit_price: number;
+  currency?: string;
   description?: string;
   is_active: boolean;
   created_at: string;
@@ -98,7 +100,7 @@ export default function FarmerListingsPage() {
   const pasif   = listings.filter(l => !l.is_active).length;
   const toplamDeger = listings
     .filter(l => l.is_active)
-    .reduce((s, l) => s + Number(l.quantity) * Number(l.unit_price), 0);
+    .reduce((s, l) => s + convertToEur(Number(l.quantity) * Number(l.unit_price), l.currency), 0);
 
   // İlan verilmemiş lotlar
   const listedLotIds = new Set(listings.map(l => l.lot_id));
@@ -114,6 +116,7 @@ export default function FarmerListingsPage() {
         quantity:     Number(lot.quantity),
         unit:         lot.unit,
         unit_price:   lot.unit_cost > 0 ? Number(lot.unit_cost) : undefined,
+        currency:     (lot as any).currency || 'EUR',
       });
     }
   }
@@ -125,6 +128,7 @@ export default function FarmerListingsPage() {
     quantity: number;
     unit: string;
     unit_price: number;
+    currency?: string;
     description?: string;
   }) {
     setCreating(true);
@@ -148,6 +152,7 @@ export default function FarmerListingsPage() {
     setEditListing(listing);
     editForm.setFieldsValue({
       unit_price:  Number(listing.unit_price),
+      currency:    listing.currency || 'EUR',
       quantity:    Number(listing.quantity),
       description: listing.description,
     });
@@ -156,6 +161,7 @@ export default function FarmerListingsPage() {
 
   async function onEditSubmit(values: {
     unit_price: number;
+    currency?: string;
     quantity: number;
     description?: string;
   }) {
@@ -205,13 +211,13 @@ export default function FarmerListingsPage() {
     },
     {
       title: 'Birim Fiyat', dataIndex: 'unit_price', key: 'unit_price',
-      render: (v: number) => <Text strong style={{ color: '#f50' }}>{Number(v).toFixed(2)} €/{'{'}birim{'}'}</Text>,
+      render: (v: number, r: FarmerListing) => <Text strong style={{ color: '#f50' }}>{formatMoney(v, r.currency)} / {r.unit}</Text>,
     },
     {
       title: 'Toplam Değer', key: 'total',
       render: (_: unknown, r: FarmerListing) => (
         <Tag color="green">
-          {(Number(r.quantity) * Number(r.unit_price)).toFixed(2)} €
+          {formatMoney(Number(r.quantity) * Number(r.unit_price), r.currency, true)}
         </Tag>
       ),
     },
@@ -378,33 +384,42 @@ export default function FarmerListingsPage() {
                 </Select>
               </Form.Item>
             </Col>
-            <Col span={8}>
-              <Form.Item
-                name="unit_price" label="Birim Fiyat (€)"
-                rules={[{ required: true, message: 'Fiyat girin' }]}
-              >
-                <InputNumber min={0} step={0.01} precision={2} style={{ width: '100%' }} addonAfter="€" />
+            <Col span={10}>
+              <Form.Item label="Birim Fiyat" required>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <Form.Item
+                    name="unit_price"
+                    noStyle
+                    rules={[{ required: true, message: 'Fiyat girin' }]}
+                  >
+                    <InputNumber min={0} step={0.01} precision={2} style={{ flex: 1 }} placeholder="0.00" />
+                  </Form.Item>
+                  <Form.Item name="currency" noStyle initialValue="EUR">
+                    <CurrencySelect />
+                  </Form.Item>
+                </div>
               </Form.Item>
             </Col>
           </Row>
 
           {/* Anlık toplam hesap */}
           <Form.Item noStyle shouldUpdate={(prev, cur) =>
-            prev.quantity !== cur.quantity || prev.unit_price !== cur.unit_price
+            prev.quantity !== cur.quantity || prev.unit_price !== cur.unit_price || prev.currency !== cur.currency
           }>
             {({ getFieldValue }) => {
               const qty   = getFieldValue('quantity') ?? 0;
               const price = getFieldValue('unit_price') ?? 0;
+              const cur   = getFieldValue('currency') ?? 'EUR';
               const total = qty * price;
               return total > 0 ? (
                 <div style={{
                   padding: '8px 14px', background: '#f6ffed', borderRadius: 8,
                   border: '1px solid #b7eb8f', marginBottom: 16,
-                  display: 'flex', justifyContent: 'space-between',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                 }}>
                   <Text type="secondary">Toplam Değer</Text>
                   <Text strong style={{ color: '#52c41a', fontSize: 16 }}>
-                    {total.toFixed(2)} €
+                    {formatMoney(total, cur, true)}
                   </Text>
                 </div>
               ) : null;
@@ -445,7 +460,7 @@ export default function FarmerListingsPage() {
           )}
 
           <Row gutter={12}>
-            <Col span={12}>
+            <Col span={10}>
               <Form.Item
                 name="quantity" label="Satış Miktarı"
                 rules={[{ required: true, message: 'Miktar girin' }]}
@@ -454,33 +469,44 @@ export default function FarmerListingsPage() {
                   style={{ width: '100%' }} addonAfter={editListing?.unit} />
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item
-                name="unit_price" label="Birim Fiyat (€)"
-                rules={[{ required: true, message: 'Fiyat girin' }]}
-              >
-                <InputNumber min={0} step={0.01} precision={2}
-                  style={{ width: '100%' }} addonAfter="€" />
+            <Col span={14}>
+              <Form.Item label="Birim Fiyat" required>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <Form.Item
+                    name="unit_price"
+                    noStyle
+                    rules={[{ required: true, message: 'Fiyat girin' }]}
+                  >
+                    <InputNumber min={0} step={0.01} precision={2}
+                      style={{ flex: 1 }} placeholder="0.00" />
+                  </Form.Item>
+                  <Form.Item name="currency" noStyle initialValue="EUR">
+                    <CurrencySelect />
+                  </Form.Item>
+                </div>
               </Form.Item>
             </Col>
           </Row>
 
           {/* Anlık toplam */}
           <Form.Item noStyle shouldUpdate={(prev, cur) =>
-            prev.quantity !== cur.quantity || prev.unit_price !== cur.unit_price
+            prev.quantity !== cur.quantity || prev.unit_price !== cur.unit_price || prev.currency !== cur.currency
           }>
             {({ getFieldValue }) => {
               const qty   = getFieldValue('quantity') ?? 0;
               const price = getFieldValue('unit_price') ?? 0;
+              const cur   = getFieldValue('currency') ?? 'EUR';
               const total = qty * price;
               return total > 0 ? (
                 <div style={{
                   padding: '8px 14px', background: '#f6ffed', borderRadius: 8,
                   border: '1px solid #b7eb8f', marginBottom: 16,
-                  display: 'flex', justifyContent: 'space-between',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                 }}>
                   <Text type="secondary">Toplam Değer</Text>
-                  <Text strong style={{ color: '#52c41a' }}>{total.toFixed(2)} €</Text>
+                  <Text strong style={{ color: '#52c41a' }}>
+                    {formatMoney(total, cur, true)}
+                  </Text>
                 </div>
               ) : null;
             }}

@@ -10,6 +10,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { rawMaterialService, ocrService } from '../../services/api';
+import { formatMoney, convertToEur, CurrencySelect, EurEquivalentPreview } from '../../utils/currency';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -48,6 +49,7 @@ interface RawMaterial {
   unit: string;
   unit_price: number;
   total_cost: number;
+  currency?: string;
   lot_number: string;
   lot_status: string;
   created_at: string;
@@ -98,6 +100,7 @@ export default function RawMaterialsPage() {
       quantity: ocrResult.quantity,
       unit: ocrResult.unit || 'kg',
       unit_price: ocrResult.unit_price,
+      currency: (ocrResult as any).currency || 'EUR',
       supplier_name: ocrResult.supplier_name,
       expiry_date: ocrResult.expiry_date ? dayjs(ocrResult.expiry_date) : undefined,
     });
@@ -167,7 +170,7 @@ export default function RawMaterialsPage() {
   const activeCount = materials.filter(m => m.lot_status === 'active').length;
   const totalValue  = materials
     .filter(m => m.lot_status === 'active')
-    .reduce((s, m) => s + Number(m.total_cost), 0);
+    .reduce((s, m) => s + convertToEur(Number(m.total_cost), m.currency), 0);
 
   const columns = [
     {
@@ -185,11 +188,11 @@ export default function RawMaterialsPage() {
     },
     {
       title: 'Birim Fiyat', dataIndex: 'unit_price', key: 'unit_price',
-      render: (v: number) => `${Number(v).toFixed(2)} €`,
+      render: (v: number, r: RawMaterial) => formatMoney(v, r.currency),
     },
     {
       title: 'Toplam Değer', dataIndex: 'total_cost', key: 'total_cost',
-      render: (v: number) => <Text strong>{Number(v).toFixed(2)} €</Text>,
+      render: (v: number, r: RawMaterial) => <Text strong>{formatMoney(v, r.currency, true)}</Text>,
     },
     {
       title: 'Lot No', dataIndex: 'lot_number', key: 'lot_number',
@@ -348,8 +351,33 @@ export default function RawMaterialsPage() {
             </Col>
           </Row>
 
-          <Form.Item name="unit_price" label="Birim Fiyat (€)" rules={[{ required: true, message: 'Fiyat girin' }]}>
-            <InputNumber min={0} step={0.01} precision={2} style={{ width: '100%' }} addonAfter="€/birim" />
+          <Form.Item label="Birim Fiyat" required style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Form.Item
+                name="unit_price"
+                noStyle
+                rules={[{ required: true, message: 'Fiyat girin' }]}
+              >
+                <InputNumber
+                  min={0}
+                  step={0.01}
+                  precision={2}
+                  style={{ flex: 1 }}
+                  placeholder="0.00"
+                />
+              </Form.Item>
+              <Form.Item name="currency" noStyle initialValue="EUR">
+                <CurrencySelect />
+              </Form.Item>
+            </div>
+            <Form.Item noStyle shouldUpdate={(prev, cur) => prev.unit_price !== cur.unit_price || prev.currency !== cur.currency}>
+              {({ getFieldValue }) => (
+                <EurEquivalentPreview
+                  amount={getFieldValue('unit_price')}
+                  currency={getFieldValue('currency')}
+                />
+              )}
+            </Form.Item>
           </Form.Item>
 
           <Form.Item name="supplier_name" label="Tedarikçi">
@@ -476,10 +504,10 @@ export default function RawMaterialsPage() {
                       <Text strong style={{ color: '#1890ff' }}>{ocrResult.quantity} {ocrResult.unit}</Text>
                     </Descriptions.Item>
                     <Descriptions.Item label="Birim Fiyat">
-                      {ocrResult.unit_price?.toFixed(2)} € / {ocrResult.unit}
+                      {formatMoney(ocrResult.unit_price, (ocrResult as any).currency || 'EUR')} / {ocrResult.unit}
                     </Descriptions.Item>
                     <Descriptions.Item label="Toplam Tutar">
-                      <Text strong style={{ color: '#52c41a' }}>{ocrResult.total_amount?.toFixed(2)} €</Text>
+                      <Text strong style={{ color: '#52c41a' }}>{formatMoney(ocrResult.total_amount, (ocrResult as any).currency || 'EUR', true)}</Text>
                     </Descriptions.Item>
                     <Descriptions.Item label="Parti / Lot No">
                       <Tag color="purple">{ocrResult.lot_number}</Tag>

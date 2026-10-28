@@ -8,6 +8,7 @@ import {
   ShoppingCartOutlined, InfoCircleOutlined,
 } from '@ant-design/icons';
 import { listingService, purchaseService } from '../../services/api';
+import { formatMoney } from '../../utils/currency';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -30,6 +31,7 @@ interface FarmerListing {
   quantity: number;
   unit: string;
   unit_price: number;
+  currency?: string;
   description?: string;
   is_active: boolean;
   created_at: string;
@@ -126,7 +128,7 @@ export default function MarketListingsPage() {
                       <Text type="secondary" style={{ fontSize: 12 }}>{listing.farmer_name}</Text>
                     </div>
                     <Tag color={meta.color} style={{ fontSize: 13, padding: '2px 10px' }}>
-                      {Number(listing.unit_price).toFixed(2)} € / {listing.unit}
+                      {formatMoney(listing.unit_price, listing.currency)} / {listing.unit}
                     </Tag>
                   </div>
 
@@ -149,7 +151,7 @@ export default function MarketListingsPage() {
                     paddingTop: 8, borderTop: '1px solid #f0f0f0',
                   }}>
                     <Text strong style={{ color: '#52c41a', fontSize: 14 }}>
-                      Toplam: {total.toFixed(2)} €
+                      Toplam: {formatMoney(total, listing.currency, true)}
                     </Text>
                     <Button
                       size="small" icon={<InfoCircleOutlined />}
@@ -212,12 +214,12 @@ export default function MarketListingsPage() {
               </Descriptions.Item>
               <Descriptions.Item label="Birim Fiyat">
                 <Text strong style={{ color: '#f50' }}>
-                  {Number(selected.unit_price).toFixed(2)} € / {selected.unit}
+                  {formatMoney(selected.unit_price, selected.currency)} / {selected.unit}
                 </Text>
               </Descriptions.Item>
               <Descriptions.Item label="Toplam Değer">
                 <Text strong style={{ color: '#52c41a' }}>
-                  {(Number(selected.quantity) * Number(selected.unit_price)).toFixed(2)} €
+                  {formatMoney(Number(selected.quantity) * Number(selected.unit_price), selected.currency, true)}
                 </Text>
               </Descriptions.Item>
             </Descriptions>
@@ -350,7 +352,7 @@ function BuyForm({
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
           <Text type="secondary">Birim Fiyat</Text>
-          <Text>{price.toFixed(2)} € / {listing.unit}</Text>
+          <Text>{formatMoney(price, listing.currency)} / {listing.unit}</Text>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
           <Text type="secondary">Miktar</Text>
@@ -359,7 +361,7 @@ function BuyForm({
         <Divider style={{ margin: '8px 0' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <Text strong style={{ fontSize: 15 }}>Toplam</Text>
-          <Text strong style={{ fontSize: 18, color: '#52c41a' }}>{total.toFixed(2)} €</Text>
+          <Text strong style={{ fontSize: 18, color: '#52c41a' }}>{formatMoney(total, listing.currency, true)}</Text>
         </div>
       </div>
 

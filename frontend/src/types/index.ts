@@ -25,6 +25,7 @@ export interface Lot {
   unit: string;
   unit_cost?: number;
   total_cost?: number;
+  currency?: string;
   supplier_name?: string;
   production_date?: string;
   expiry_date?: string;
@@ -109,6 +110,7 @@ export interface FarmerListing {
   quantity: number;
   unit: string;
   unit_price: number;
+  currency?: string;
   description?: string;
   is_active: boolean;
 }

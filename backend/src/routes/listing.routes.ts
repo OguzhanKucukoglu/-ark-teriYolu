@@ -147,13 +147,14 @@ router.get('/farmer', async (_req, res) => {
 
 // Yeni hayvancı ilanı oluştur
 router.post('/farmer', authorize('hayvanci'), async (req: AuthRequest, res) => {
-  const { lot_id, product_name, quantity, unit, unit_price, description } = req.body;
+  const { lot_id, product_name, quantity, unit, unit_price, currency, description } = req.body;
+  const curr = currency ? String(currency).trim().toUpperCase() : 'EUR';
   try {
     const listingId = await insertQuery(
       sequelize,
-      `INSERT INTO farmer_listings (farmer_id, lot_id, product_name, quantity, unit, unit_price, description)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [req.user!.id, lot_id, product_name, quantity, unit, unit_price, description || null]
+      `INSERT INTO farmer_listings (farmer_id, lot_id, product_name, quantity, unit, unit_price, currency, description)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.user!.id, lot_id, product_name, quantity, unit, unit_price, curr, description || null]
     );
     res.status(201).json({ message: 'İlan oluşturuldu', listingId });
   } catch {
@@ -163,12 +164,18 @@ router.post('/farmer', authorize('hayvanci'), async (req: AuthRequest, res) => {
 
 // Hayvancı ilanı güncelle
 router.put('/farmer/:id', authorize('hayvanci'), async (req: AuthRequest, res) => {
-  const { unit_price, quantity, description } = req.body;
+  const { unit_price, quantity, currency, description } = req.body;
+  const curr = currency ? String(currency).trim().toUpperCase() : null;
   try {
     await sequelize.query(
-      `UPDATE farmer_listings SET unit_price = ?, quantity = ?, description = ?, updated_at = NOW()
+      `UPDATE farmer_listings 
+       SET unit_price = ?, 
+           currency = COALESCE(?, currency),
+           quantity = ?, 
+           description = ?, 
+           updated_at = NOW()
        WHERE id = ? AND farmer_id = ?`,
-      { replacements: [unit_price, quantity, description || null, req.params.id, req.user!.id] }
+      { replacements: [unit_price, curr, quantity, description || null, req.params.id, req.user!.id] }
     );
     res.json({ message: 'İlan güncellendi' });
   } catch {

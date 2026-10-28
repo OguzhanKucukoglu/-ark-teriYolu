@@ -21,6 +21,7 @@ import reportRoutes       from './routes/report.routes';
 import invoiceRoutes      from './routes/invoice.routes';
 import anomalyRoutes      from './routes/anomaly.routes';
 import ocrRoutes          from './routes/ocr.routes';
+import currencyRoutes     from './routes/currency.routes';
 
 dotenv.config();
 
@@ -49,6 +50,7 @@ app.use('/api/reports',       reportRoutes);
 app.use('/api/invoices',      invoiceRoutes);
 app.use('/api/anomalies',     anomalyRoutes);
 app.use('/api/ocr',           ocrRoutes);
+app.use('/api/currencies',    currencyRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -103,6 +105,24 @@ async function bootstrap() {
       await sequelize.query('ALTER TABLE order_raw_materials MODIFY COLUMN lot_id INT UNSIGNED NULL');
     } catch {
       // Yoksay
+    }
+
+    // Çoklu Para Birimi Sütunları Senkronizasyonu (Idempotent)
+    const currencyCols = [
+      { table: 'raw_materials', col: 'currency', type: "VARCHAR(10) NOT NULL DEFAULT 'EUR'" },
+      { table: 'lots', col: 'currency', type: "VARCHAR(10) NOT NULL DEFAULT 'EUR'" },
+      { table: 'butchery_operations', col: 'currency', type: "VARCHAR(10) NOT NULL DEFAULT 'EUR'" },
+      { table: 'farmer_listings', col: 'currency', type: "VARCHAR(10) NOT NULL DEFAULT 'EUR'" },
+      { table: 'market_purchases', col: 'currency', type: "VARCHAR(10) NOT NULL DEFAULT 'EUR'" },
+      { table: 'orders', col: 'currency', type: "VARCHAR(10) NOT NULL DEFAULT 'EUR'" },
+      { table: 'producer_listings', col: 'currency', type: "VARCHAR(10) NOT NULL DEFAULT 'EUR'" },
+    ];
+    for (const c of currencyCols) {
+      try {
+        await sequelize.query(`ALTER TABLE ${c.table} ADD COLUMN ${c.col} ${c.type}`);
+      } catch {
+        // Kolon zaten varsa yoksayılır
+      }
     }
 
     app.listen(PORT, () => {

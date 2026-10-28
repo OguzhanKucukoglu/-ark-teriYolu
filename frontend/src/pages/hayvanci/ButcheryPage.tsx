@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { butcheryService, mlService } from '../../services/api';
+import { formatMoney, CurrencySelect, EurEquivalentPreview } from '../../utils/currency';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -137,6 +138,7 @@ export default function ButcheryPage() {
   const [inputWeightKg, setInputWeightKg]   = useState<number | null>(25.0);
   const [animalEarTag, setAnimalEarTag]     = useState<string>('TR-06-KUZU-001');
   const [purchaseCost, setPurchaseCost]     = useState<number | null>(287.50);
+  const [currency, setCurrency]             = useState<string>('EUR');
   const [distMethod, setDistMethod]         = useState<'agirlik' | 'deger'>('agirlik');
   const [partWeights, setPartWeights]       = useState<PartWeight[]>([]);
   const [cutDate, setCutDate]               = useState<Dayjs>(dayjs());
@@ -347,6 +349,7 @@ export default function ButcheryPage() {
         total_cost:          purchaseCost,
         unit_cost_input:     unitCostInput,
         distribution_method: distMethod,
+        currency:            currency,
         notes:               notes || null,
         parts: partWeights.map(p => ({
           part_name:        p.part_name,
@@ -414,7 +417,7 @@ export default function ButcheryPage() {
     },
     {
       title: 'Toplam Alış Maliyeti', dataIndex: 'total_cost', key: 'total_cost',
-      render: (v: number) => v ? <strong style={{ color: '#f50' }}>{Number(v).toFixed(2)} €</strong> : '-',
+      render: (v: number, r: ButcheryRecord) => v ? <strong style={{ color: '#f50' }}>{formatMoney(v, (r as any).currency, true)}</strong> : '-',
     },
     {
       title: 'Dağıtım Anahtarı', dataIndex: 'distribution_method', key: 'distribution_method',
@@ -601,20 +604,26 @@ export default function ButcheryPage() {
               </Col>
               <Col xs={24} sm={8}>
                 <Text style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Toplam Alış Maliyeti:</Text>
-                <InputNumber
-                  min={0}
-                  step={10}
-                  precision={2}
-                  addonAfter="€"
-                  style={{ width: '100%' }}
-                  value={purchaseCost}
-                  onChange={v => setPurchaseCost(v)}
-                />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <InputNumber
+                    min={0}
+                    step={10}
+                    precision={2}
+                    style={{ flex: 1 }}
+                    value={purchaseCost}
+                    onChange={v => setPurchaseCost(v)}
+                  />
+                  <CurrencySelect
+                    value={currency}
+                    onChange={v => setCurrency(v)}
+                  />
+                </div>
+                <EurEquivalentPreview amount={purchaseCost} currency={currency} />
               </Col>
             </Row>
 
             <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888' }}>
-              <span>Hesaplanan Giriş Birim Fiyatı: <strong>{unitCostInput.toFixed(2)} €/kg</strong></span>
+              <span>Hesaplanan Giriş Birim Fiyatı: <strong>{formatMoney(unitCostInput, currency)} / kg</strong></span>
               <span>Kesim Tarihi: <DatePicker size="small" value={cutDate} onChange={v => v && setCutDate(v)} /></span>
             </div>
           </Card>
@@ -682,8 +691,8 @@ export default function ButcheryPage() {
                     <th style={{ padding: '6px 8px' }}>Parça Adı</th>
                     {distMethod === 'deger' && <th style={{ padding: '6px 8px' }}>Değer Çarpanı</th>}
                     <th style={{ padding: '6px 8px', width: 150 }}>Fiili Ağırlık (kg)</th>
-                    <th style={{ padding: '6px 8px', textAlign: 'right' }}>Maliyet Payı (€)</th>
-                    <th style={{ padding: '6px 8px', textAlign: 'right' }}>Birim Maliyet (€/kg)</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'right' }}>Maliyet Payı</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'right' }}>Birim Maliyet</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -723,10 +732,10 @@ export default function ButcheryPage() {
                           />
                         </td>
                         <td style={{ padding: '6px 8px', textAlign: 'right' }}>
-                          <strong style={{ color: '#0958d9' }}>{calc.allocatedCost.toFixed(2)} €</strong>
+                          <strong style={{ color: '#0958d9' }}>{formatMoney(calc.allocatedCost, currency)}</strong>
                         </td>
                         <td style={{ padding: '6px 8px', textAlign: 'right' }}>
-                          <Tag color="cyan">{calc.unitCost.toFixed(2)} €/kg</Tag>
+                          <Tag color="cyan">{formatMoney(calc.unitCost, currency)} / kg</Tag>
                         </td>
                       </tr>
                     );
@@ -759,7 +768,7 @@ export default function ButcheryPage() {
               <Col xs={12} sm={6}>
                 <Text type="secondary" style={{ fontSize: 11 }}>Toplam Dağıtılan Maliyet:</Text>
                 <div style={{ fontWeight: 700, fontSize: 14, color: '#52c41a' }}>
-                  {totalAllocatedCost.toFixed(2)} € / {(purchaseCost || 0).toFixed(2)} €
+                  {formatMoney(totalAllocatedCost, currency)} / {formatMoney(purchaseCost || 0, currency)}
                 </div>
               </Col>
             </Row>
@@ -817,7 +826,7 @@ export default function ButcheryPage() {
             onClick={onSubmit}
             style={{ borderRadius: 8 }}
           >
-            Parçalamayı ve Maliyet Dağıtımını Onayla ({totalOutputKg.toFixed(1)} kg Çıkış · {(purchaseCost || 0).toFixed(2)} €)
+            Parçalamayı ve Maliyet Dağıtımını Onayla ({totalOutputKg.toFixed(1)} kg Çıkış · {formatMoney(purchaseCost || 0, currency)})
           </Button>
         </div>
       </Modal>
@@ -859,7 +868,7 @@ export default function ButcheryPage() {
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="Toplam Alış Maliyeti">
-                <strong style={{ color: '#f50' }}>{Number(detail.operation.total_cost).toFixed(2)} €</strong>
+                <strong style={{ color: '#f50' }}>{formatMoney(detail.operation.total_cost, (detail.operation as any).currency, true)}</strong>
               </Descriptions.Item>
               <Descriptions.Item label="Dağıtım Anahtarı" span={2}>
                 {detail.operation.distribution_method === 'deger'
@@ -881,8 +890,8 @@ export default function ButcheryPage() {
                   { title: 'Parça Adı', dataIndex: 'part_name', key: 'part_name', render: (v: string) => <strong>{v}</strong> },
                   { title: 'Lot No', dataIndex: 'lot_number', key: 'lot_number', render: (v: string) => <Tag>{v}</Tag> },
                   { title: 'Ağırlık', dataIndex: 'actual_weight_kg', key: 'actual_weight_kg', render: (v: number) => `${Number(v).toFixed(2)} kg` },
-                  { title: 'Dağıtılan Maliyet', dataIndex: 'allocated_cost', key: 'allocated_cost', render: (v: number) => <strong style={{ color: '#0958d9' }}>{Number(v).toFixed(2)} €</strong> },
-                  { title: 'Birim Maliyet', dataIndex: 'unit_cost', key: 'unit_cost', render: (v: number) => <Tag color="cyan">{Number(v).toFixed(2)} €/kg</Tag> },
+                  { title: 'Dağıtılan Maliyet', dataIndex: 'allocated_cost', key: 'allocated_cost', render: (v: number) => <strong style={{ color: '#0958d9' }}>{formatMoney(v, (detail?.operation as any)?.currency)}</strong> },
+                  { title: 'Birim Maliyet', dataIndex: 'unit_cost', key: 'unit_cost', render: (v: number) => <Tag color="cyan">{formatMoney(v, (detail?.operation as any)?.currency)} / kg</Tag> },
                 ]}
               />
             </Card>

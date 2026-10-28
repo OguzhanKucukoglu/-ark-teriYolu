@@ -10,6 +10,7 @@ export interface OcrExtractionResult {
   quantity: number;
   unit: string;
   unit_price: number;
+  currency?: string;
   total_amount: number;
   lot_number: string;
   expiry_date?: string;
@@ -28,6 +29,7 @@ const SAMPLE_INVOICES: Record<string, OcrExtractionResult> = {
     quantity: 100.00,
     unit: 'kg',
     unit_price: 9.70,
+    currency: 'EUR',
     total_amount: 970.00,
     lot_number: 'ET-2026-881',
     expiry_date: new Date(Date.now() + 60 * 24 * 3600 * 1000).toISOString().split('T')[0],
@@ -51,6 +53,7 @@ const SAMPLE_INVOICES: Record<string, OcrExtractionResult> = {
     quantity: 25.00,
     unit: 'kg',
     unit_price: 24.00,
+    currency: 'EUR',
     total_amount: 600.00,
     lot_number: 'BAH-2026-442',
     expiry_date: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString().split('T')[0],
@@ -74,6 +77,7 @@ const SAMPLE_INVOICES: Record<string, OcrExtractionResult> = {
     quantity: 50.00,
     unit: 'kg',
     unit_price: 11.60,
+    currency: 'EUR',
     total_amount: 580.00,
     lot_number: 'BAG-2026-118',
     expiry_date: new Date(Date.now() + 180 * 24 * 3600 * 1000).toISOString().split('T')[0],
@@ -134,9 +138,17 @@ export async function parseInvoiceOcr(req: AuthRequest, res: Response): Promise<
     const quantity = qtyMatch ? parseFloat(qtyMatch[1].replace(',', '.')) : 100.0;
     const unit = qtyMatch ? qtyMatch[2].toLowerCase() : 'kg';
 
-    // Fiyat çıkarımı (örn: 9.70 EUR, 15.50 €)
-    const priceMatch = textToAnalyze.match(/(\d+[.,]?\d*)\s*(€|eur|tl|try)/i);
+    // Fiyat ve Para Birimi çıkarımı (örn: 9.70 EUR, 15.50 €, 450 TL, 25 $)
+    const priceMatch = textToAnalyze.match(/(\d+[.,]?\d*)\s*(€|eur|tl|try|₺|\$|usd|£|gbp)/i);
     const unitPrice = priceMatch ? parseFloat(priceMatch[1].replace(',', '.')) : 9.50;
+    let detectedCurrency = 'EUR';
+    if (priceMatch && priceMatch[2]) {
+      const cur = priceMatch[2].toLowerCase();
+      if (cur.includes('tl') || cur.includes('try') || cur.includes('₺')) detectedCurrency = 'TRY';
+      else if (cur.includes('$') || cur.includes('usd')) detectedCurrency = 'USD';
+      else if (cur.includes('£') || cur.includes('gbp')) detectedCurrency = 'GBP';
+      else detectedCurrency = 'EUR';
+    }
 
     // Lot / Parti no çıkarımı
     const lotMatch = textToAnalyze.match(/(ET|HAM|BAH|BAG|LOT|PRC)[- ]?(\d{4})?[- ]?(\w+)/i);
@@ -155,6 +167,7 @@ export async function parseInvoiceOcr(req: AuthRequest, res: Response): Promise<
       quantity,
       unit,
       unit_price: unitPrice,
+      currency: detectedCurrency,
       total_amount: parseFloat((quantity * unitPrice).toFixed(2)),
       lot_number: lotNumber,
       expiry_date: new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString().split('T')[0],

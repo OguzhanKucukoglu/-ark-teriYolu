@@ -12,6 +12,7 @@ import {
   ThunderboltOutlined, ClearOutlined,
 } from '@ant-design/icons';
 import { listingService, mlService, rawMaterialService, butcheryService, orderService } from '../../services/api';
+import { formatMoney } from '../../utils/currency';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -153,6 +154,7 @@ interface ProducerListing {
   product_name: string;
   description?: string;
   service_price: number;
+  currency?: string;
   service_unit: string;
   min_order_qty?: number;
   required_materials?: string;
@@ -695,7 +697,7 @@ export default function ProducerListingsPage() {
 
                   <div style={{ marginBottom: 10 }}>
                     <Tag color={meta.color} style={{ fontSize: 13, padding: '2px 10px', fontWeight: 600 }}>
-                      {Number(listing.service_price).toFixed(2)} € / {listing.service_unit}
+                      {formatMoney(listing.service_price, listing.currency)} / {listing.service_unit}
                     </Tag>
                     {listing.min_order_qty && (
                       <Tag style={{ fontSize: 11 }}>Min. {listing.min_order_qty} {listing.service_unit}</Tag>
@@ -810,7 +812,7 @@ export default function ProducerListingsPage() {
                 )}
                 <Descriptions.Item label="Hizmet Fiyatı">
                   <Text strong style={{ color: '#f50', fontSize: 15 }}>
-                    {Number(selListing.service_price).toFixed(2)} € / {selListing.service_unit}
+                    {formatMoney(selListing.service_price, selListing.currency)} / {selListing.service_unit}
                   </Text>
                 </Descriptions.Item>
                 <Descriptions.Item label="Min. Sipariş">
@@ -913,7 +915,7 @@ export default function ProducerListingsPage() {
                 <div>
                   <Text type="secondary">Hizmet Bedeli: </Text>
                   <Text strong style={{ color: '#f50', fontSize: 15 }}>
-                    {Number(orderListing.service_price).toFixed(2)} € / {orderListing.service_unit}
+                    {formatMoney(orderListing.service_price, orderListing.currency)} / {orderListing.service_unit}
                   </Text>
                 </div>
               </div>

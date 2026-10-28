@@ -345,7 +345,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
       dataIndex: 'total_amount',
       key: 'total_amount',
       align: 'right' as const,
-      render: (val: number) => <Text strong style={{ color: '#1d4ed8' }}>{Number(val).toFixed(2)} ${invoice.currency}</Text>,
+      render: (val: number) => <Text strong style={{ color: '#1d4ed8' }}>{Number(val).toFixed(2)} {invoice.currency}</Text>,
     },
   ];
 

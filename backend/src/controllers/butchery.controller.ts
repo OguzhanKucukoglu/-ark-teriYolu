@@ -56,9 +56,11 @@ export async function createButcheryOperation(req: AuthRequest, res: Response): 
     total_cost,
     unit_cost_input,
     distribution_method,
+    currency,
     parts,
     notes,
   } = req.body;
+  const curr = currency ? String(currency).trim().toUpperCase() : 'EUR';
 
   if (!animal_type || !operation_date || !parts || !Array.isArray(parts) || parts.length === 0) {
     res.status(400).json({ error: 'animal_type, operation_date ve parts zorunludur' });
@@ -120,8 +122,8 @@ export async function createButcheryOperation(req: AuthRequest, res: Response): 
       `INSERT INTO butchery_operations (
         operator_id, animal_type, animal_ear_tag, operation_date,
         input_weight_kg, total_output_kg, waste_kg,
-        total_cost, unit_cost_input, distribution_method, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        total_cost, unit_cost_input, distribution_method, currency, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.user!.id,
         animal_type,
@@ -133,6 +135,7 @@ export async function createButcheryOperation(req: AuthRequest, res: Response): 
         totalCost,
         unitCostIn,
         distMethod,
+        curr,
         notes ?? null,
       ],
       t
@@ -156,8 +159,8 @@ export async function createButcheryOperation(req: AuthRequest, res: Response): 
         sequelize,
         `INSERT INTO lots (
           lot_number, lot_type, owner_id, quantity, unit,
-          unit_cost, total_cost, production_date, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          unit_cost, total_cost, currency, production_date, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           lotNumber,
           'parca',
@@ -166,6 +169,7 @@ export async function createButcheryOperation(req: AuthRequest, res: Response): 
           'kg',
           part.unitCost,
           part.allocatedCost,
+          curr,
           operation_date,
           'active',
         ],
@@ -212,9 +216,9 @@ export async function createButcheryOperation(req: AuthRequest, res: Response): 
 
         await insertQuery(
           sequelize,
-          `INSERT INTO raw_materials (owner_id, lot_id, material_type, quantity, unit, unit_price, total_cost)
-           VALUES (?, ?, ?, ?, 'kg', ?, ?)`,
-          [req.user!.id, lotId, animalLabel, part.actual_weight_kg, part.unitCost, part.allocatedCost],
+          `INSERT INTO raw_materials (owner_id, lot_id, material_type, quantity, unit, unit_price, total_cost, currency)
+           VALUES (?, ?, ?, ?, 'kg', ?, ?, ?)`,
+          [req.user!.id, lotId, animalLabel, part.actual_weight_kg, part.unitCost, part.allocatedCost, curr],
           t
         );
       }

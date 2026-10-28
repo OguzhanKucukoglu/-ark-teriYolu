@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { purchaseService, invoiceService } from '../../services/api';
 import { Invoice } from '../../types';
 import { InvoiceModal } from '../../components/InvoiceModal';
+import { formatMoney, convertToEur } from '../../utils/currency';
 
 const { Title, Text } = Typography;
 
@@ -31,6 +32,7 @@ interface SaleItem {
   unit: string;
   unit_price: number;
   total_price: number;
+  currency?: string;
   status: string;
   purchase_date: string;
   complaint_count?: number;
@@ -100,7 +102,7 @@ export default function FarmerSalesPage() {
 
   // İstatistik hesaplamaları
   const totalRevenue = useMemo(
-    () => sales.reduce((sum, s) => sum + Number(s.total_price || 0), 0),
+    () => sales.reduce((sum, s) => sum + convertToEur(Number(s.total_price || 0), s.currency), 0),
     [sales]
   );
 
@@ -153,15 +155,15 @@ export default function FarmerSalesPage() {
       title: 'Birim Fiyat',
       dataIndex: 'unit_price',
       key: 'unit_price',
-      render: (v: number, r: SaleItem) => `${Number(v).toFixed(2)} € / ${r.unit}`,
+      render: (v: number, r: SaleItem) => `${formatMoney(v, r.currency)} / ${r.unit}`,
     },
     {
       title: 'Toplam Tutar',
       dataIndex: 'total_price',
       key: 'total_price',
-      render: (v: number) => (
+      render: (v: number, r: SaleItem) => (
         <Tag color="green" style={{ fontSize: 13, fontWeight: 600 }}>
-          {Number(v).toFixed(2)} €
+          {formatMoney(v, r.currency, true)}
         </Tag>
       ),
     },
@@ -479,11 +481,11 @@ export default function FarmerSalesPage() {
                 <Text strong>{Number(selectedSale.quantity).toFixed(2)} {selectedSale.unit}</Text>
               </Descriptions.Item>
               <Descriptions.Item label="Birim Fiyat">
-                {Number(selectedSale.unit_price).toFixed(2)} € / {selectedSale.unit}
+                {formatMoney(selectedSale.unit_price, selectedSale.currency)} / {selectedSale.unit}
               </Descriptions.Item>
               <Descriptions.Item label="Toplam Tutar" span={2}>
                 <Text strong style={{ color: '#52c41a', fontSize: 16 }}>
-                  {Number(selectedSale.total_price).toFixed(2)} €
+                  {formatMoney(selectedSale.total_price, selectedSale.currency, true)}
                 </Text>
               </Descriptions.Item>
               <Descriptions.Item label="Satış Tarihi" span={2}>

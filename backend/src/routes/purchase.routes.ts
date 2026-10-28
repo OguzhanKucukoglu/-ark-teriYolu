@@ -27,11 +27,17 @@ router.post('/', authorize('market'), async (req: AuthRequest, res) => {
 
     const totalPrice = quantity * unit_price;
 
+    const listings = await selectQuery<{ product_name: string; currency: string }>(
+      sequelize, 'SELECT product_name, currency FROM farmer_listings WHERE id = ?', [listing_id], t
+    );
+    const productName = listings[0]?.product_name || 'Narin Sucuk 1kg';
+    const currency = listings[0]?.currency || 'EUR';
+
     const purchaseId = await insertQuery(
       sequelize,
-      `INSERT INTO market_purchases (market_id, farmer_id, listing_id, lot_id, quantity, unit, unit_price, total_price, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'teslim_alindi')`,
-      [req.user!.id, farmer_id, listing_id, lot_id, quantity, unit, unit_price, totalPrice],
+      `INSERT INTO market_purchases (market_id, farmer_id, listing_id, lot_id, quantity, unit, unit_price, total_price, currency, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'teslim_alindi')`,
+      [req.user!.id, farmer_id, listing_id, lot_id, quantity, unit, unit_price, totalPrice, currency],
       t
     );
 
@@ -78,17 +84,12 @@ router.post('/', authorize('market'), async (req: AuthRequest, res) => {
     const invoiceNumber = `FTR-SAT-${new Date().getFullYear()}-${String(invSeq).padStart(3, '0')}`;
     const lotNumber = lots[0]?.lot_number || 'LOT';
 
-    const listings = await selectQuery<{ title: string }>(
-      sequelize, 'SELECT title FROM farmer_listings WHERE id = ?', [listing_id], t
-    );
-    const productName = listings[0]?.title || 'Narin Sucuk 1kg';
-
     await insertQuery(
       sequelize,
       `INSERT INTO invoices 
        (invoice_number, invoice_type, sender_id, receiver_id, reference_type, reference_id, lot_number, product_name, description, quantity, unit, unit_price, subtotal, tax_rate, tax_amount, total_amount, currency, status, invoice_date)
-       VALUES (?, 'satis', ?, ?, 'market_purchase', ?, ?, ?, 'Toptan mamul sucuk satışı faturası.', ?, ?, ?, ?, 0.00, 0.00, ?, '€', 'odendi', NOW())`,
-      [invoiceNumber, farmer_id, req.user!.id, purchaseId, lotNumber, productName, quantity, unit, unit_price, totalPrice, totalPrice],
+       VALUES (?, 'satis', ?, ?, 'market_purchase', ?, ?, ?, 'Toptan mamul sucuk satışı faturası.', ?, ?, ?, ?, 0.00, 0.00, ?, ?, 'odendi', NOW())`,
+      [invoiceNumber, farmer_id, req.user!.id, purchaseId, lotNumber, productName, quantity, unit, unit_price, totalPrice, totalPrice, currency],
       t
     );
 
