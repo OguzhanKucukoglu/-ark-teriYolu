@@ -19,6 +19,19 @@ import { formatUnit, formatDbProduct } from '../../i18n/formatters';
 
 const { Title, Text } = Typography;
 
+function formatComplaintMessage(msg?: string | null, t?: (key: string, params?: any) => string): string {
+  if (!msg) return '';
+  if (!t) return msg;
+
+  const match = msg.match(/^"([^"]+)" marketi, "([^"]+)" numaralı lot için sorun bildirdi:\s*"(.*)"\s*\.?$/);
+  if (match) {
+    const [, market, lot, detail] = match;
+    return t('sales.complaintReportedNotice', { market, lot, detail });
+  }
+
+  return msg;
+}
+
 interface SaleItem {
   id: number;
   market_id: number;
@@ -453,11 +466,11 @@ export default function FarmerSalesPage() {
                 showIcon
                 style={{ marginBottom: 16 }}
                 message={t('market.reportComplaint')}
-                description={selectedSale.latest_complaint}
+                description={formatComplaintMessage(selectedSale.latest_complaint, t)}
               />
             )}
 
-            <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
+            <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} style={{ marginBottom: 16 }}>
               <Descriptions.Item label={t('sales.buyerMarket')} span={2}>
                 <Text strong>{selectedSale.market_name}</Text>
               </Descriptions.Item>
@@ -472,16 +485,16 @@ export default function FarmerSalesPage() {
                 </Descriptions.Item>
               )}
               <Descriptions.Item label={t('listings.productName')}>
-                {selectedSale.product_name || selectedSale.lot_number}
+                {formatDbProduct(selectedSale.product_name, t) || selectedSale.lot_number}
               </Descriptions.Item>
               <Descriptions.Item label={t('common.lotNumber')}>
                 <Tag color="blue">{selectedSale.lot_number}</Tag>
               </Descriptions.Item>
               <Descriptions.Item label={t('common.quantity')}>
-                <Text strong>{Number(selectedSale.quantity).toFixed(2)} {selectedSale.unit}</Text>
+                <Text strong>{Number(selectedSale.quantity).toFixed(2)} {formatUnit(selectedSale.unit, t)}</Text>
               </Descriptions.Item>
               <Descriptions.Item label={t('common.unitPrice')}>
-                {formatMoney(selectedSale.unit_price, selectedSale.currency)} / {selectedSale.unit}
+                {formatMoney(selectedSale.unit_price, selectedSale.currency)} / {formatUnit(selectedSale.unit, t)}
               </Descriptions.Item>
               <Descriptions.Item label={t('common.totalPrice')} span={2}>
                 <Text strong style={{ color: '#52c41a', fontSize: 16 }}>

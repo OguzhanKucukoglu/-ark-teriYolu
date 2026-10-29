@@ -125,9 +125,69 @@ export function formatDbAnimal(animal?: string | null, t?: (key: string) => stri
 
 export function formatDbPart(part?: string | null, t?: (key: string) => string): string {
   if (!part) return '';
-  const p = part.toString().trim().toLowerCase();
-  if (!t) return part;
+  const trimmed = part.toString().trim();
+  if (!t) return trimmed;
 
+  // 1. Compound "Animal - Cut" (e.g. "inek - But", "dana - Antrikot", "koyun - Pirzola")
+  if (trimmed.includes(' - ') || trimmed.includes(' – ')) {
+    const separator = trimmed.includes(' – ') ? ' – ' : ' - ';
+    const segments = trimmed.split(separator);
+    if (segments.length === 2) {
+      const [animalPart, cutPart] = segments;
+      const translatedAnimal = formatDbAnimal(animalPart, t);
+      const translatedCut = formatDbPart(cutPart, t);
+      return `${translatedAnimal} - ${translatedCut}`;
+    }
+  }
+
+  const p = trimmed.toLowerCase();
+
+  // 2. Ingredients / Raw materials
+  const materialMap: Record<string, string> = {
+    'yağ': 'materials.fat',
+    'yag': 'materials.fat',
+    'fat': 'materials.fat',
+    'sarımsak': 'materials.garlic',
+    'sarimsak': 'materials.garlic',
+    'garlic': 'materials.garlic',
+    'tuz': 'materials.salt',
+    'salt': 'materials.salt',
+    'baharat': 'materials.spices',
+    'spices': 'materials.spices',
+    'spice': 'materials.spices',
+    'bağırsak': 'materials.casing',
+    'bagirsak': 'materials.casing',
+    'doğal bağırsak': 'materials.casing',
+    'dogal bagirsak': 'materials.casing',
+    'natural casing': 'materials.casing',
+    'casing': 'materials.casing',
+    'jelatin': 'materials.gelatin',
+    'gelatin': 'materials.gelatin',
+    'ilikli kemik suyu': 'materials.boneBroth',
+    'kemik suyu': 'materials.boneBroth',
+    'bone broth': 'materials.boneBroth',
+    'yumurta akı': 'materials.eggWhite',
+    'yumurta aki': 'materials.eggWhite',
+    'egg white': 'materials.eggWhite',
+    'kırmızı pancar suyu': 'materials.beetrootJuice',
+    'kirmizi pancar suyu': 'materials.beetrootJuice',
+    'beetroot juice': 'materials.beetrootJuice',
+    'yoğurt': 'materials.yogurt',
+    'yogurt': 'materials.yogurt',
+    'salça': 'materials.tomatoPaste',
+    'salca': 'materials.tomatoPaste',
+    'tomato paste': 'materials.tomatoPaste',
+    'çemen': 'materials.fenugreek',
+    'cemen': 'materials.fenugreek',
+    'fenugreek': 'materials.fenugreek',
+  };
+
+  if (materialMap[p]) {
+    const translated = t(materialMap[p]);
+    if (translated && translated !== materialMap[p]) return translated;
+  }
+
+  // 3. Meat Cuts
   const keyMap: Record<string, string> = {
     'pirzola': 'pirzola',
     'kuzu pirzola': 'pirzola',
@@ -152,8 +212,6 @@ export function formatDbPart(part?: string | null, t?: (key: string) => string):
     'kuşbaşı': 'kuşbaşı',
     'kusbasi': 'kuşbaşı',
     'incik': 'incik',
-    'bağırsak': 'bağırsak',
-    'bagirsak': 'bağırsak',
     'antrikot': 'antrikot',
     'bonfile': 'bonfile',
     'kontrfile': 'kontrfile',
@@ -169,8 +227,6 @@ export function formatDbPart(part?: string | null, t?: (key: string) => string):
     'tranc': 'tranç',
     'kemik': 'kemik',
     'sakatat': 'sakatat',
-    'yağ': 'yağ',
-    'yag': 'yağ',
   };
 
   const mappedKey = keyMap[p];
@@ -179,7 +235,7 @@ export function formatDbPart(part?: string | null, t?: (key: string) => string):
     if (translated && translated !== 'parts.' + mappedKey) return translated;
   }
 
-  return part;
+  return trimmed;
 }
 
 export function formatDbRole(role?: string | null, t?: (key: string) => string): string {
@@ -192,4 +248,43 @@ export function formatDbRole(role?: string | null, t?: (key: string) => string):
   if (r === 'market') return t('roles.market') || 'Market';
 
   return role;
+}
+
+export function formatInvoiceItemTitle(productName?: string | null, isHizmet?: boolean, t?: (key: string) => string): string {
+  if (!productName) return '';
+  const trimmed = productName.toString().trim();
+  if (!t) return trimmed;
+
+  const lower = trimmed.toLowerCase();
+  const isToll = isHizmet || lower.includes('fason') || lower.includes('işçilik');
+
+  if (isToll) {
+    let baseProd = trimmed;
+    if (trimmed.includes(' - ')) {
+      baseProd = trimmed.split(' - ')[0].trim();
+    }
+    const translatedProd = formatDbProduct(baseProd, t);
+    const suffix = t('invoices.tollServiceSuffix') || 'Fason Üretim / İşçilik Hizmeti';
+    return `${translatedProd} - ${suffix}`;
+  }
+
+  return formatDbProduct(trimmed, t);
+}
+
+export function formatInvoiceDescription(invoice?: { invoice_type?: string; description?: string } | null, t?: (key: string) => string): string {
+  if (!invoice) return '';
+  if (!t) return invoice.description || '';
+
+  const isHizmet = invoice.invoice_type === 'hizmet';
+  const desc = (invoice.description || '').toLowerCase();
+
+  if (isHizmet || desc.includes('hammadde') || desc.includes('fason')) {
+    return t('invoices.serviceDescriptionDefault');
+  }
+
+  if (invoice.invoice_type === 'satis' || desc.includes('mamul') || desc.includes('satış')) {
+    return t('invoices.salesDescriptionDefault');
+  }
+
+  return invoice.description || '';
 }

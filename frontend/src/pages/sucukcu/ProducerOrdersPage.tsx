@@ -10,7 +10,7 @@ import {
 import dayjs from 'dayjs';
 import { orderService } from '../../services/api';
 import { useTranslation } from '../../i18n';
-import { formatUnit, formatDbStatus, formatDbPart } from '../../i18n/formatters';
+import { formatUnit, formatDbStatus, formatDbPart, formatDbProduct } from '../../i18n/formatters';
 
 const { Title, Text } = Typography;
 
@@ -219,14 +219,14 @@ export default function ProducerOrdersPage() {
       >
         {detail && (
           <div>
-            <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
+            <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} style={{ marginBottom: 16 }}>
               <Descriptions.Item label={t('production.farmLabel')} span={2}>
                 <Text strong>{detail.order.buyer_name}</Text>
               </Descriptions.Item>
-              <Descriptions.Item label={t('production.productName')}>{detail.order.product_name}</Descriptions.Item>
+              <Descriptions.Item label={t('production.productName')}>{formatDbProduct(detail.order.product_name, t)}</Descriptions.Item>
               <Descriptions.Item label={t('production.expectedQty')}>
-                <Text strong style={{ color: '#52c41a' }}>{Math.round(Number(detail.order.expected_qty))} {t('production.packageUnit')}</Text>
-                <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>(1 kg / {t('production.packageUnit')})</Text>
+                <Text strong style={{ color: '#52c41a' }}>{Math.round(Number(detail.order.expected_qty))} {formatUnit('paket', t)}</Text>
+                <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>(1 kg / {formatUnit('paket', t)})</Text>
               </Descriptions.Item>
               <Descriptions.Item label={t('orders.orderDate')} span={2}>
                 {dayjs(detail.order.order_date).format('DD.MM.YYYY HH:mm')}

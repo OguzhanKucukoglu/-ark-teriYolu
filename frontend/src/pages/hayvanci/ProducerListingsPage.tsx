@@ -14,6 +14,7 @@ import {
 import { listingService, mlService, rawMaterialService, butcheryService, orderService } from '../../services/api';
 import { formatMoney } from '../../utils/currency';
 import { useTranslation } from '../../i18n';
+import { formatDbProduct, formatDbAnimal, formatDbPart, formatUnit } from '../../i18n/formatters';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -539,9 +540,9 @@ export default function ProducerListingsPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <Space>
             <FilterOutlined style={{ color: '#1890ff', fontSize: 16 }} />
-            <Text strong style={{ fontSize: 14 }}>İlan Filtreleme</Text>
+            <Text strong style={{ fontSize: 14 }}>{t('producerListings.filterTitle')}</Text>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              ({displayed.length} ilan listeleniyor · Depoda toplam {totalAvailMeatKg.toFixed(1)} kg et mevcut)
+              {t('producerListings.filterStats', { count: displayed.length, meat: totalAvailMeatKg.toFixed(1) })}
             </Text>
           </Space>
           {hasActiveFilters && (
@@ -552,7 +553,7 @@ export default function ProducerListingsPage() {
               icon={<ClearOutlined />}
               onClick={() => { setSearch(''); setSelProduct(null); setSelAnimal(null); }}
             >
-              Filtreleri Temizle
+              {t('producerListings.clearFilters')}
             </Button>
           )}
         </div>
@@ -561,7 +562,7 @@ export default function ProducerListingsPage() {
           {/* Ürün Filtresi */}
           <Col xs={24} md={14}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <Text type="secondary" style={{ fontSize: 12, minWidth: 65 }}>Ürün Türü:</Text>
+              <Text type="secondary" style={{ fontSize: 12, minWidth: 65 }}>{t('producerListings.productType')}</Text>
               <div
                 onClick={() => setSelProduct(null)}
                 style={{
@@ -573,7 +574,7 @@ export default function ProducerListingsPage() {
                   fontSize: 12, transition: 'all 0.15s',
                 }}
               >
-                Tümü ({listings.length})
+                {t('common.all')} ({listings.length})
               </div>
               {Object.entries(PRODUCT_META).map(([name, meta]) => {
                 const active = selProduct === name;
@@ -593,7 +594,7 @@ export default function ProducerListingsPage() {
                     }}
                   >
                     <span>{meta.emoji}</span>
-                    <span>{name}</span>
+                    <span>{formatDbProduct(name, t)}</span>
                     <Tag style={{ marginLeft: 2, fontSize: 10, padding: '0 4px' }} bordered={false}>{count}</Tag>
                   </div>
                 );
@@ -604,7 +605,7 @@ export default function ProducerListingsPage() {
           {/* Hayvan Türü Uyumu Filtresi */}
           <Col xs={24} md={10}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <Text type="secondary" style={{ fontSize: 12, minWidth: 75 }}>Hayvan Türü:</Text>
+              <Text type="secondary" style={{ fontSize: 12, minWidth: 75 }}>{t('producerListings.animalType')}</Text>
               <div
                 onClick={() => setSelAnimal(null)}
                 style={{
@@ -616,7 +617,7 @@ export default function ProducerListingsPage() {
                   fontSize: 12, transition: 'all 0.15s',
                 }}
               >
-                Fark Etmez
+                {t('producerListings.anyAnimal')}
               </div>
               {Object.entries(ANIMAL_META).map(([key, meta]) => {
                 const active = selAnimal === key;
@@ -639,7 +640,7 @@ export default function ProducerListingsPage() {
                     }}
                   >
                     <span>{meta.emoji}</span>
-                    <span>{meta.label}</span>
+                    <span>{formatDbAnimal(key, t)}</span>
                     {animalMeatKg > 0 && (
                       <Tag color="cyan" style={{ fontSize: 9, marginLeft: 2, padding: '0 4px' }}>
                         {animalMeatKg.toFixed(0)} kg
@@ -655,9 +656,9 @@ export default function ProducerListingsPage() {
 
       {/* ── İLAN LİSTESİ ── */}
       {loading || stockLoading ? (
-        <Card style={{ textAlign: 'center', padding: 40 }}><Text type="secondary">İlanlar ve stok bilgileri yükleniyor...</Text></Card>
+        <Card style={{ textAlign: 'center', padding: 40 }}><Text type="secondary">{t('producerListings.loadingListings')}</Text></Card>
       ) : displayed.length === 0 ? (
-        <Empty description={selProduct ? `${selProduct} için aktif ilan bulunamadı` : 'Kriterlere uygun ilan bulunamadı'} />
+        <Empty description={selProduct ? t('producerListings.noListingForProduct', { product: formatDbProduct(selProduct, t) }) : t('producerListings.noListingCriteria')} />
       ) : (
         <Row gutter={[16, 16]}>
           {displayed.map(listing => {
@@ -682,7 +683,7 @@ export default function ProducerListingsPage() {
                       background: batches > 0 ? '#52c41a' : '#ff4d4f',
                       color: '#fff', borderRadius: 10, padding: '2px 8px', fontSize: 11, fontWeight: 700,
                     }}>
-                      {batches > 0 ? `≈ ${Math.floor(batches)} paket kapasite` : 'Stok yetersiz'}
+                      {batches > 0 ? t('producerListings.capacityBatch', { count: Math.floor(batches) }) : t('producerListings.insufficientStock')}
                     </div>
                   )}
 
@@ -692,17 +693,17 @@ export default function ProducerListingsPage() {
                       borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>{meta.emoji}</div>
                     <div>
-                      <Text strong style={{ fontSize: 16 }}>{listing.product_name}</Text><br />
+                      <Text strong style={{ fontSize: 16 }}>{formatDbProduct(listing.product_name, t)}</Text><br />
                       <Text type="secondary" style={{ fontSize: 12 }}>{listing.producer_name}</Text>
                     </div>
                   </div>
 
                   <div style={{ marginBottom: 10 }}>
                     <Tag color={meta.color} style={{ fontSize: 13, padding: '2px 10px', fontWeight: 600 }}>
-                      {formatMoney(listing.service_price, listing.currency)} / {listing.service_unit}
+                      {formatMoney(listing.service_price, listing.currency)} / {formatUnit(listing.service_unit, t)}
                     </Tag>
                     {listing.min_order_qty && (
-                      <Tag style={{ fontSize: 11 }}>Min. {listing.min_order_qty} {listing.service_unit}</Tag>
+                      <Tag style={{ fontSize: 11 }}>Min. {listing.min_order_qty} {formatUnit(listing.service_unit, t)}</Tag>
                     )}
                   </div>
 
@@ -716,7 +717,7 @@ export default function ProducerListingsPage() {
                   {matKeys.length > 0 && (
                     <div style={{ marginBottom: 12, marginTop: 'auto' }}>
                       <Text style={{ fontSize: 11, color: '#888', display: 'block', marginBottom: 4 }}>
-                        Birim İhtiyaç & Depodaki Stok:
+                        {t('producerListings.unitReqAndStock')}
                       </Text>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                         {matKeys.map(key => {
@@ -730,7 +731,7 @@ export default function ProducerListingsPage() {
                               color={isOk ? 'green' : 'orange'}
                               style={{ fontSize: 11, padding: '1px 6px' }}
                             >
-                              {key}: {need} {mats[key].unit} <span style={{ opacity: 0.75 }}>({avail.toFixed(0)} stok)</span>
+                              {formatDbPart(key, t)}: {need} {formatUnit(mats[key].unit, t)} <span style={{ opacity: 0.75 }}>({avail.toFixed(0)} {t('producerListings.stock')})</span>
                             </Tag>
                           );
                         })}

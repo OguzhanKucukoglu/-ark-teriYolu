@@ -21,13 +21,13 @@ export type Language = 'tr' | 'en' | 'de';
 export interface LanguageOption {
   code: Language;
   label: string;
-  flag: string;
+  badge: string;
 }
 
 export const LANGUAGES: LanguageOption[] = [
-  { code: 'tr', label: 'Türkçe',  flag: '🇹🇷' },
-  { code: 'en', label: 'English', flag: '🇬🇧' },
-  { code: 'de', label: 'Deutsch', flag: '🇩🇪' },
+  { code: 'tr', label: 'Türkçe',  badge: 'TR' },
+  { code: 'en', label: 'English', badge: 'EN' },
+  { code: 'de', label: 'Deutsch', badge: 'DE' },
 ];
 
 const LOCALES_DATA: Record<Language, any> = { tr, en, de };
@@ -126,7 +126,20 @@ export const LanguageSwitcher: React.FC<{ style?: React.CSSProperties }> = ({ st
     key: l.code,
     label: (
       <Space>
-        <span>{l.flag}</span>
+        <span style={{
+          fontSize: 11,
+          fontWeight: 700,
+          padding: '1px 5px',
+          borderRadius: 4,
+          background: l.code === language ? '#e6f4ff' : '#f5f5f5',
+          color: l.code === language ? '#1677ff' : '#595959',
+          border: '1px solid #d9d9d9',
+          minWidth: 26,
+          textAlign: 'center',
+          display: 'inline-block',
+        }}>
+          {l.badge}
+        </span>
         <span style={{ fontWeight: l.code === language ? 600 : 400 }}>{l.label}</span>
       </Space>
     ),
@@ -137,7 +150,17 @@ export const LanguageSwitcher: React.FC<{ style?: React.CSSProperties }> = ({ st
     <Dropdown menu={{ items: menuItems }} placement="bottomRight" trigger={['click']}>
       <Button style={{ display: 'inline-flex', alignItems: 'center', gap: 6, ...style }}>
         <GlobalOutlined />
-        <span>{current.flag} {current.label}</span>
+        <span style={{
+          fontSize: 11,
+          fontWeight: 700,
+          padding: '1px 5px',
+          borderRadius: 3,
+          background: '#f0f0f0',
+          color: '#262626',
+        }}>
+          {current.badge}
+        </span>
+        <span>{current.label}</span>
       </Button>
     </Dropdown>
   );

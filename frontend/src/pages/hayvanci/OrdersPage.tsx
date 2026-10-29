@@ -175,7 +175,7 @@ export default function OrdersPage() {
             <span>{t('orders.detailTitle')} #{detail?.order.id}</span>
             {detail && (
               <Tag color={STATUS_MAP[detail.order.status]?.color ?? 'default'}>
-                {detail.order.status === 'beklemede' ? t('common.pending') : detail.order.status === 'uretimde' ? t('common.inProduction') : detail.order.status === 'tamamlandi' ? t('common.completed') : (STATUS_MAP[detail.order.status]?.label ?? detail.order.status)}
+                {formatDbStatus(detail.order.status, t)}
               </Tag>
             )}
           </div>
@@ -208,11 +208,11 @@ export default function OrdersPage() {
               </div>
             </div>
 
-            <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
-              <Descriptions.Item label={t('production.productName')}>{detail.order.product_name}</Descriptions.Item>
+            <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} style={{ marginBottom: 16 }}>
+              <Descriptions.Item label={t('production.productName')}>{formatDbProduct(detail.order.product_name, t)}</Descriptions.Item>
               <Descriptions.Item label={t('production.expectedQty')}>
-                <Text strong style={{ color: '#52c41a' }}>{Math.round(Number(detail.order.expected_qty))} {t('production.packageUnit')}</Text>
-                <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>(1 kg / {t('production.packageUnit')})</Text>
+                <Text strong style={{ color: '#52c41a' }}>{Math.round(Number(detail.order.expected_qty))} {formatUnit('paket', t)}</Text>
+                <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>(1 kg / {formatUnit('paket', t)})</Text>
               </Descriptions.Item>
               <Descriptions.Item label={t('orders.orderDate')} span={2}>
                 {dayjs(detail.order.order_date).format('DD.MM.YYYY HH:mm')}
@@ -226,7 +226,7 @@ export default function OrdersPage() {
 
             {detail.rawMaterials.length > 0 && (
               <>
-                <Divider style={{ margin: '12px 0' }}>Gönderilen Hammaddeler</Divider>
+                <Divider style={{ margin: '12px 0' }}>{t('orders.sentRawMaterials')}</Divider>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {detail.rawMaterials.map(rm => (
                     <div key={rm.id} style={{

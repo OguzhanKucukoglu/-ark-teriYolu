@@ -11,7 +11,7 @@ import {
 import dayjs from 'dayjs';
 import { reportService, mlService, anomalyService } from '../../services/api';
 import { useTranslation } from '../../i18n';
-import { formatUnit, formatDbStatus, formatDbPart } from '../../i18n/formatters';
+import { formatUnit, formatDbStatus, formatDbPart, formatDbProduct, formatDbAnimal } from '../../i18n/formatters';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -99,41 +99,41 @@ export default function ReportsPage() {
   // 1. Parçalama Kolonları
   const butcheryColumns = [
     {
-      title: 'Tarih',
+      title: t('common.date'),
       dataIndex: 'operation_date',
       key: 'operation_date',
       render: (v: string) => dayjs(v).format('DD.MM.YYYY'),
     },
     {
-      title: 'Tür / Operatör',
+      title: t('reports.animalOperator'),
       key: 'type',
       render: (_: unknown, r: any) => (
         <div>
-          <Tag color="geekblue" style={{ textTransform: 'capitalize' }}>{r.animal_type}</Tag>
+          <Tag color="geekblue" style={{ textTransform: 'capitalize' }}>{formatDbAnimal(r.animal_type, t)}</Tag>
           <Text type="secondary" style={{ fontSize: 12 }}>{r.operator_name}</Text>
         </div>
       ),
     },
     {
-      title: 'Giriş Ağırlığı',
+      title: t('reports.inputWeight'),
       dataIndex: 'input_weight_kg',
       key: 'input_weight_kg',
       render: (v: number) => <Text strong>{v.toFixed(2)} kg</Text>,
     },
     {
-      title: 'Net Çıktı',
+      title: t('reports.netOutput'),
       dataIndex: 'total_output_kg',
       key: 'total_output_kg',
       render: (v: number) => `${v.toFixed(2)} kg`,
     },
     {
-      title: 'Fire Ağırlığı',
+      title: t('reports.wasteWeight'),
       dataIndex: 'waste_kg',
       key: 'waste_kg',
       render: (v: number) => <Text type="danger">{v.toFixed(2)} kg</Text>,
     },
     {
-      title: 'Fire Oranı',
+      title: t('reports.wasteRate'),
       dataIndex: 'waste_percent',
       key: 'waste_percent',
       render: (v: number) => (
@@ -143,20 +143,20 @@ export default function ReportsPage() {
       ),
     },
     {
-      title: 'Toplam Maliyet',
+      title: t('reports.totalCost'),
       dataIndex: 'total_cost',
       key: 'total_cost',
       render: (v: number) => `${v.toFixed(2)} €`,
     },
     {
-      title: 'Maliyet Dengesi',
+      title: t('reports.costBalance'),
       key: 'cost_balance',
       render: (_: unknown, r: any) => {
         const partsTotal = (r.parts || []).reduce((sum: number, p: any) => sum + (p.allocated_cost || 0), 0);
         const balanced = Math.abs(partsTotal - r.total_cost) < 0.05;
         return (
           <Tag color={balanced ? 'success' : 'error'}>
-            {balanced ? '✓ Tam Dengeli' : `Fark: ${(partsTotal - r.total_cost).toFixed(2)} €`}
+            {balanced ? t('reports.fullyBalanced') : `${t('reports.difference')}: ${(partsTotal - r.total_cost).toFixed(2)} €`}
           </Tag>
         );
       },
@@ -166,35 +166,35 @@ export default function ReportsPage() {
   // 2. Üretim Kolonları (Sapma Gösterimli)
   const productionColumns = [
     {
-      title: 'Üretim No',
+      title: t('reports.prodNo'),
       dataIndex: 'production_number',
       key: 'production_number',
       render: (v: string) => <Tag color="blue">{v}</Tag>,
     },
     {
-      title: 'Ürün Adı',
+      title: t('production.productName'),
       dataIndex: 'product_name',
       key: 'product_name',
-      render: (v: string) => <Text strong>{v}</Text>,
+      render: (v: string) => <Text strong>{formatDbProduct(v, t)}</Text>,
     },
     {
-      title: 'Beklenen (Paket)',
+      title: `${t('production.expectedQty')} (${t('units.package')})`,
       dataIndex: 'expected_qty',
       key: 'expected_qty',
-      render: (v: number) => `${Math.round(Number(v))} Paket`,
+      render: (v: number) => `${Math.round(Number(v))} ${formatUnit('paket', t)}`,
     },
     {
-      title: 'Gerçekleşen (Paket)',
+      title: `${t('production.actualQty')} (${t('units.package')})`,
       dataIndex: 'actual_qty',
       key: 'actual_qty',
       render: (v: number) => (
         <Text strong style={{ color: '#1890ff' }}>
-          {v ? `${Math.round(Number(v))} Paket` : '—'}
+          {v ? `${Math.round(Number(v))} ${formatUnit('paket', t)}` : '—'}
         </Text>
       ),
     },
     {
-      title: 'Fire / Dolum Kaybı',
+      title: t('reports.wasteFillingLoss'),
       key: 'fire',
       render: (_: unknown, r: any) => {
         if (!r.fire_qty && r.fire_qty !== 0) return '—';
@@ -207,19 +207,19 @@ export default function ReportsPage() {
       },
     },
     {
-      title: 'Hammadde (€)',
+      title: `${t('reports.rawMaterialCost')} (€)`,
       dataIndex: 'total_raw_cost',
       key: 'total_raw_cost',
       render: (v: number) => `${Number(v || 0).toFixed(2)} €`,
     },
     {
-      title: 'Hizmet Bedeli (€)',
+      title: `${t('reports.serviceCost')} (€)`,
       dataIndex: 'service_cost',
       key: 'service_cost',
       render: (v: number) => `${Number(v || 0).toFixed(2)} €`,
     },
     {
-      title: 'Gerçek EKP (€/paket)',
+      title: `${t('reports.actualEkp')} (€/${formatUnit('paket', t)})`,
       dataIndex: 'ekp',
       key: 'ekp',
       render: (v: number) => (
@@ -229,13 +229,13 @@ export default function ReportsPage() {
       ),
     },
     {
-      title: 'VKP (%38 Marj)',
+      title: t('reports.vkpTarget'),
       dataIndex: 'vkp',
       key: 'vkp',
       render: (v: number) => v ? `${Number(v).toFixed(4)} €` : '—',
     },
     {
-      title: 'Brüt Kâr Marjı',
+      title: t('reports.grossMargin'),
       dataIndex: 'brut_kar_marji',
       key: 'brut_kar_marji',
       render: (v: number) => (
@@ -249,54 +249,54 @@ export default function ReportsPage() {
   // 3. Lot Hareketleri Kolonları
   const movementColumns = [
     {
-      title: 'Tarih',
+      title: t('common.date'),
       dataIndex: 'created_at',
       key: 'created_at',
       render: (v: string) => dayjs(v).format('DD.MM.YYYY HH:mm'),
     },
     {
-      title: 'Lot Numarası',
+      title: t('common.lotNumber'),
       key: 'lot_number',
       render: (_: unknown, r: any) => (
         <div>
           <Tag color={r.lot_status === 'recalled' ? 'red' : 'blue'}>{r.lot_number}</Tag>
-          <Text type="secondary" style={{ fontSize: 11 }}>({r.lot_type})</Text>
+          <Text type="secondary" style={{ fontSize: 11 }}>({formatDbStatus(r.lot_type, t) || r.lot_type})</Text>
         </div>
       ),
     },
     {
-      title: 'Hareket Türü',
+      title: t('reports.movementType'),
       dataIndex: 'movement_type',
       key: 'movement_type',
       render: (v: string) => {
-        const map: Record<string, { label: string; color: string }> = {
-          giris:    { label: 'Giriş', color: 'green' },
-          cikis:    { label: 'Çıkış', color: 'orange' },
-          sevk:     { label: 'Sevk', color: 'blue' },
-          satis:    { label: 'Satış', color: 'purple' },
-          bloke:    { label: 'Bloke / Recall', color: 'red' },
-          fire:     { label: 'Fire', color: 'default' },
+        const map: Record<string, { labelKey: string; color: string }> = {
+          giris:    { labelKey: 'reports.movements.giris', color: 'green' },
+          cikis:    { labelKey: 'reports.movements.cikis', color: 'orange' },
+          sevk:     { labelKey: 'reports.movements.sevk', color: 'blue' },
+          satis:    { labelKey: 'reports.movements.satis', color: 'purple' },
+          bloke:    { labelKey: 'reports.movements.bloke', color: 'red' },
+          fire:     { labelKey: 'reports.movements.fire', color: 'default' },
         };
-        const m = map[v] || { label: v, color: 'default' };
-        return <Tag color={m.color}>{m.label}</Tag>;
+        const m = map[v];
+        return <Tag color={m?.color || 'default'}>{m ? t(m.labelKey) : v}</Tag>;
       },
     },
     {
-      title: 'Miktar',
+      title: t('common.quantity'),
       key: 'qty',
-      render: (_: unknown, r: any) => `${Number(r.quantity).toFixed(2)} ${r.unit}`,
+      render: (_: unknown, r: any) => `${Number(r.quantity).toFixed(2)} ${formatUnit(r.unit, t)}`,
     },
     {
-      title: 'Kaynak → Hedef',
+      title: t('reports.sourceToTarget'),
       key: 'transfer',
       render: (_: unknown, r: any) => (
         <Text style={{ fontSize: 12 }}>
-          {r.from_user_name || 'Sistem / Alış'} → {r.to_user_name || 'İşletme / Stok'}
+          {r.from_user_name || t('reports.systemPurchase')} → {r.to_user_name || t('reports.enterpriseStock')}
         </Text>
       ),
     },
     {
-      title: 'Referans',
+      title: t('reports.reference'),
       key: 'ref',
       render: (_: unknown, r: any) => (
         <Tag style={{ fontSize: 11 }}>{r.reference_type} #{r.reference_id}</Tag>
@@ -307,13 +307,13 @@ export default function ReportsPage() {
   // 4. Satış Kolonları
   const salesColumns = [
     {
-      title: 'Tarih',
+      title: t('common.date'),
       dataIndex: 'purchase_date',
       key: 'purchase_date',
       render: (v: string) => dayjs(v).format('DD.MM.YYYY HH:mm'),
     },
     {
-      title: 'Alıcı Market',
+      title: t('sales.buyerMarket'),
       dataIndex: 'market_name',
       key: 'market_name',
       render: (v: string, r: any) => (
@@ -324,40 +324,40 @@ export default function ReportsPage() {
       ),
     },
     {
-      title: 'Ürün / Lot',
+      title: `${t('listings.productName')} / ${t('common.lotNumber')}`,
       key: 'product',
       render: (_: unknown, r: any) => (
         <div>
-          <Text strong>{r.product_name || r.lot_number}</Text>
+          <Text strong>{formatDbProduct(r.product_name, t) || r.lot_number}</Text>
           <div><Tag color="blue">{r.lot_number}</Tag></div>
         </div>
       ),
     },
     {
-      title: 'Miktar',
+      title: t('common.quantity'),
       key: 'quantity',
-      render: (_: unknown, r: any) => `${Number(r.quantity).toFixed(2)} ${r.unit}`,
+      render: (_: unknown, r: any) => `${Number(r.quantity).toFixed(2)} ${formatUnit(r.unit, t)}`,
     },
     {
-      title: 'Birim Fiyat',
+      title: t('common.unitPrice'),
       dataIndex: 'unit_price',
       key: 'unit_price',
-      render: (v: number, r: any) => `${Number(v).toFixed(2)} € / ${r.unit}`,
+      render: (v: number, r: any) => `${Number(v).toFixed(2)} € / ${formatUnit(r.unit, t)}`,
     },
     {
-      title: 'Toplam Tutar',
+      title: t('common.totalPrice'),
       dataIndex: 'total_price',
       key: 'total_price',
       render: (v: number) => <Tag color="green" style={{ fontSize: 13 }}>{Number(v).toFixed(2)} €</Tag>,
     },
     {
-      title: 'Şikayet Durumu',
+      title: t('reports.complaintStatus'),
       key: 'complaint',
       render: (_: unknown, r: any) => (
         Number(r.complaint_count || 0) > 0 ? (
-          <Tag color="red">⚠️ Sorun Bildirildi ({r.complaint_count})</Tag>
+          <Tag color="red">⚠️ {t('reports.issueReported')} ({r.complaint_count})</Tag>
         ) : (
-          <Tag color="green">✓ Sorunsuz</Tag>
+          <Tag color="green">✓ {t('reports.noIssue')}</Tag>
         )
       ),
     },
@@ -366,37 +366,37 @@ export default function ReportsPage() {
   // 5. Geri Çağırma Kolonları
   const recallColumns = [
     {
-      title: 'Başlangıç Tarihi',
+      title: t('reports.startDate'),
       dataIndex: 'created_at',
       key: 'created_at',
       render: (v: string) => dayjs(v).format('DD.MM.YYYY HH:mm'),
     },
     {
-      title: 'Geri Çağrılan Lot',
+      title: t('reports.recalledLot'),
       dataIndex: 'lot_number',
       key: 'lot_number',
       render: (v: string) => <Tag color="red" style={{ fontSize: 13, fontWeight: 600 }}>{v}</Tag>,
     },
     {
-      title: 'Sebep / Gerekçe',
+      title: t('recalls.recallReason'),
       dataIndex: 'reason',
       key: 'reason',
       render: (v: string) => <Text style={{ color: '#cf1322' }}>{v}</Text>,
     },
     {
-      title: 'Etkilenen Market',
+      title: t('reports.affectedMarket'),
       dataIndex: 'affected_count',
       key: 'affected_count',
-      render: (v: number) => <Tag color="volcano">{v} Market</Tag>,
+      render: (v: number) => <Tag color="volcano">{v} {t('roles.market')}</Tag>,
     },
     {
-      title: 'Durum',
+      title: t('common.status'),
       dataIndex: 'status',
       key: 'status',
-      render: (v: string) => <Tag color={v === 'aktif' ? 'error' : 'success'}>{v.toUpperCase()}</Tag>,
+      render: (v: string) => <Tag color={v === 'aktif' ? 'error' : 'success'}>{formatDbStatus(v, t).toUpperCase()}</Tag>,
     },
     {
-      title: 'Başlatan',
+      title: t('reports.initiator'),
       dataIndex: 'initiator_name',
       key: 'initiator_name',
     },

@@ -9,7 +9,14 @@ import {
 } from '@ant-design/icons';
 import { Invoice } from '../types';
 import { useTranslation } from '../i18n';
-import { formatUnit, formatDbProduct, formatDbRole } from '../i18n/formatters';
+import dayjs from 'dayjs';
+import {
+  formatUnit,
+  formatDbRole,
+  formatDbStatus,
+  formatInvoiceItemTitle,
+  formatInvoiceDescription,
+} from '../i18n/formatters';
 
 const { Title, Text } = Typography;
 
@@ -24,11 +31,6 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
   if (!invoice) return null;
 
   const isHizmet = invoice.invoice_type === 'hizmet';
-  const roleLabels: Record<string, string> = {
-    hayvanci: t('roles.hayvanci'),
-    sucukcu: t('roles.sucukcu'),
-    market: t('roles.market'),
-  };
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=900,height=1000');
@@ -37,6 +39,11 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
     const invoiceTitle = isHizmet ? t('invoices.serviceInvoice').toUpperCase() : t('invoices.salesInvoice').toUpperCase();
     const senderRoleText = formatDbRole(invoice.sender_role, t);
     const receiverRoleText = formatDbRole(invoice.receiver_role, t);
+    const itemTitle = formatInvoiceItemTitle(invoice.product_name, isHizmet, t);
+    const itemDesc = formatInvoiceDescription(invoice, t);
+    const statusText = formatDbStatus(invoice.status, t);
+    const unitText = formatUnit(invoice.unit, t);
+    const formattedDate = dayjs(invoice.invoice_date).format('DD.MM.YYYY');
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -199,14 +206,14 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
         <div class="invoice-box">
           <div class="header">
             <div class="logo-area">
-              <h1>AVATAR E-FATURA</h1>
+              <h1>AVATAR ${t('invoices.eInvoiceHeader')}</h1>
               <p>${t('invoices.platformSubtitle')}</p>
             </div>
             <div class="invoice-meta">
               <h2>${invoiceTitle}</h2>
               <p><strong>${t('invoices.invoiceNumber')}:</strong> ${invoice.invoice_number}</p>
-              <p><strong>${t('common.date')}:</strong> ${new Date(invoice.invoice_date).toLocaleDateString()}</p>
-              <p><span class="badge">${t('invoices.paid')}</span></p>
+              <p><strong>${t('common.date')}:</strong> ${formattedDate}</p>
+              <p><span class="badge">${statusText}</span></p>
             </div>
           </div>
 
@@ -244,13 +251,13 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
               <tr>
                 <td>1</td>
                 <td>
-                  <strong>${formatDbProduct(invoice.product_name, t)}</strong>
+                  <strong>${itemTitle}</strong>
                   <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">
-                    ${invoice.description || (isHizmet ? t('invoices.serviceDescriptionDefault') : t('invoices.salesDescriptionDefault'))}
+                    ${itemDesc}
                   </div>
                 </td>
                 <td><code style="background: #f3f4f6; padding: 2px 5px; border-radius: 4px;">${invoice.lot_number || '-'}</code></td>
-                <td class="text-right">${Number(invoice.quantity).toLocaleString()} ${formatUnit(invoice.unit, t)}</td>
+                <td class="text-right">${Number(invoice.quantity).toLocaleString()} ${unitText}</td>
                 <td class="text-right">${Number(invoice.unit_price).toFixed(2)} ${invoice.currency}</td>
                 <td class="text-right">${Number(invoice.tax_amount).toFixed(2)} ${invoice.currency}</td>
                 <td class="text-right"><strong>${Number(invoice.total_amount).toFixed(2)} ${invoice.currency}</strong></td>
@@ -309,11 +316,11 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
       title: t('invoices.descriptionItem'),
       dataIndex: 'product_name',
       key: 'product_name',
-      render: (text: string) => (
+      render: () => (
         <div>
-          <Text strong>{text}</Text>
+          <Text strong>{formatInvoiceItemTitle(invoice.product_name, isHizmet, t)}</Text>
           <div style={{ fontSize: 12, color: '#6b7280' }}>
-            {invoice.description || (isHizmet ? t('invoices.serviceInvoice') : t('invoices.salesInvoice'))}
+            {formatInvoiceDescription(invoice, t)}
           </div>
         </div>
       ),
@@ -328,7 +335,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
       title: t('common.quantity'),
       key: 'quantity',
       align: 'right' as const,
-      render: () => `${Number(invoice.quantity).toLocaleString()} ${invoice.unit}`,
+      render: () => `${Number(invoice.quantity).toLocaleString()} ${formatUnit(invoice.unit, t)}`,
     },
     {
       title: t('common.unitPrice'),
@@ -395,7 +402,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
         >
           <div>
             <Title level={4} style={{ margin: 0, color: '#1e3a8a' }}>
-              AVATAR E-INVOICE
+              AVATAR {t('invoices.eInvoiceHeader')}
             </Title>
             <Text type="secondary" style={{ fontSize: 12 }}>
               {isHizmet ? t('invoices.serviceInvoice') : t('invoices.salesInvoice')}
@@ -406,10 +413,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
               {invoice.invoice_number}
             </div>
             <div style={{ fontSize: 12, color: '#6b7280' }}>
-              {t('common.date')}: {new Date(invoice.invoice_date).toLocaleDateString()}
+              {t('common.date')}: {dayjs(invoice.invoice_date).format('DD.MM.YYYY')}
             </div>
-            <Tag icon={<CheckCircleOutlined />} color="success" style={{ marginTop: 4 }}>
-              {t('invoices.paid')}
+            <Tag icon={<CheckCircleOutlined />} color={invoice.status === 'odendi' ? 'success' : 'default'} style={{ marginTop: 4 }}>
+              {formatDbStatus(invoice.status, t)}
             </Tag>
           </div>
         </div>
@@ -442,10 +449,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
               {invoice.sender_name}
             </div>
             <div style={{ fontSize: 12, color: '#475569', marginTop: 3 }}>
-              <strong>{t('invoices.roleTag')}</strong> {roleLabels[invoice.sender_role] || invoice.sender_role}
+              <strong>{t('invoices.roleTag')}</strong> {formatDbRole(invoice.sender_role, t)}
             </div>
             <div style={{ fontSize: 12, color: '#475569' }}>
-              <strong>E-Mail:</strong> {invoice.sender_email}
+              <strong>{t('auth.email')}:</strong> {invoice.sender_email}
             </div>
             <div style={{ fontSize: 12, color: '#64748b' }}>
               <strong>ID:</strong> #{invoice.sender_id}
@@ -478,10 +485,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ visible, invoice, on
               {invoice.receiver_name}
             </div>
             <div style={{ fontSize: 12, color: '#475569', marginTop: 3 }}>
-              <strong>{t('invoices.roleTag')}</strong> {roleLabels[invoice.receiver_role] || invoice.receiver_role}
+              <strong>{t('invoices.roleTag')}</strong> {formatDbRole(invoice.receiver_role, t)}
             </div>
             <div style={{ fontSize: 12, color: '#475569' }}>
-              <strong>E-Mail:</strong> {invoice.receiver_email}
+              <strong>{t('auth.email')}:</strong> {invoice.receiver_email}
             </div>
             <div style={{ fontSize: 12, color: '#64748b' }}>
               <strong>ID:</strong> #{invoice.receiver_id}
